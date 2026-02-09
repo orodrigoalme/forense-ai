@@ -23,6 +23,7 @@ from app.middleware.cost_tracker import CostTracker
 from app.middleware.quota import quota_manager
 from app.middleware.auth import api_key_auth
 from app.middleware.anonymous_auth import anon_auth
+from fastapi.middleware.cors import CORSMiddleware
 
 # Inicializar rastreador de custos
 cost_tracker = CostTracker()
