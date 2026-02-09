@@ -1,0 +1,5 @@
+{
+  "name": "Forense AI Viewer",
+  "description": "A professional forensic image analysis dashboard visualizing AI detection results using FFT, ELA, and Noise analysis.",
+  "requestFramePermissions": []
+}
