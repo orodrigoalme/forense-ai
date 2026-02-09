@@ -1,5 +1,5 @@
 # Use uma versão leve do Python
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # ✅ CORRIGIR ESTA LINHA (linha 6)
 # Instalar dependências de sistema para o OpenCV (GL lib)
