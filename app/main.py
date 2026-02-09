@@ -33,6 +33,15 @@ app = FastAPI(
     version="1.5.0"
 )
 
+# ✅ ADICIONAR CORS ANTES DE QUALQUER ROTA
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Permitir qualquer origem (ou especificar domínios)
+    allow_credentials=True,
+    allow_methods=["*"],  # Permitir POST, GET, OPTIONS, etc
+    allow_headers=["*"],  # Permitir qualquer header
+)
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 analysis_service = AnalysisService()
