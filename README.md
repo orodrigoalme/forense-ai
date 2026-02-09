@@ -1,240 +1,240 @@
-# Forense AI - API de Detecção Forense de Imagens Geradas por IA
+# Forense AI - Forensic Analysis API for AI-Generated Images
 
-## 📋 O que é este aplicativo?
+## 📋 What is this application?
 
-**Forense AI** é uma API REST desenvolvida em FastAPI que realiza análise forense de imagens para detectar se foram geradas ou manipuladas por Inteligência Artificial. A aplicação utiliza múltiplas técnicas de análise digital forense combinadas com IA generativa (Google Gemini) para fornecer um veredicto consolidado sobre a autenticidade de uma imagem.
+**Forense AI** is a FastAPI-based REST API that performs forensic analysis on images to detect if they were generated or manipulated by Artificial Intelligence. The application combines multiple digital forensic techniques with generative AI (Google Gemini) to provide a consolidated verdict on image authenticity.
 
-### 🆕 Versão 2.0 - Novidades
+### 🆕 Version 2.0 - What's New
 
-- ✅ **Autenticação Anônima** - Use sem cadastro via tokens JWT
-- ✅ **Limites Dinâmicos** - Aumente limites usando sua própria chave Gemini
-- ✅ **Proteção Anti-Abuso** - Rate limiting inteligente por IP/sessão
-- ✅ **Sistema de Quotas** - Controle de uso por API key e sessões anônimas
-- ✅ **Budget Caps** - Proteção automática de custos Gemini
-- ✅ **Auth Flexível** - API Key OU Token Anônimo
+- ✅ **Anonymous Authentication** - Use without registration via JWT tokens
+- ✅ **Dynamic Limits** - Increase limits using your own Gemini key
+- ✅ **Anti-Abuse Protection** - Smart rate limiting per IP/session
+- ✅ **Quota System** - Usage control per API key and anonymous sessions
+- ✅ **Budget Caps** - Automatic Gemini cost protection
+- ✅ **Flexible Auth** - API Key OR Anonymous Token
 
 ---
 
-## 🎯 Funcionalidades Principais
+## 🎯 Main Features
 
-### 1. **Análise de Ruído (NOISE)**
-Examina o padrão de ruído natural que sensores de câmeras produzem. Imagens geradas por IA tendem a ter:
-- Ruído anormalmente baixo ou perfeitamente consistente
-- Regiões "lisas demais" (pele, céu, fundos)
-- Ausência de padrão de ruído natural de sensores
+### 1. **Noise Analysis (NOISE)**
+Examines the natural noise pattern produced by camera sensors. AI-generated images tend to have:
+- Abnormally low or perfectly consistent noise
+- "Overly smooth" regions (skin, sky, backgrounds)
+- Absence of natural sensor noise patterns
 
-### 2. **Análise de Espectro de Fourier (FFT)**
-Analisa o espectro de frequências da imagem para detectar:
-- Simetria excessiva no espectro (IA gera padrões simétricos perfeitos)
-- Picos anômalos periódicos (grid artifacts, checkerboard patterns)
-- Uniformidade espectral não natural
-- Padrões de grade em alta frequência (upscaling artifacts)
+### 2. **Fourier Transform Analysis (FFT)**
+Analyzes the image's frequency spectrum to detect:
+- Excessive symmetry in the spectrum (AI generates near-perfect symmetrical patterns)
+- Periodic anomalous peaks (grid artifacts, checkerboard patterns)
+- Unnatural spectral uniformity
+- High-frequency grid patterns (upscaling artifacts)
 
 ### 3. **Error Level Analysis (ELA)**
-Técnica que recomprime a imagem JPEG e analisa as diferenças para detectar:
-- Regiões com níveis de erro inconsistentes (manipulação seletiva)
-- Áreas com erro anormalmente baixo (inserções de IA)
-- Bordas com erro inconsistente (splicing, copy-move)
-- Padrões de erro uniforme (geração IA completa)
+A technique that recompresses the JPEG image and analyzes differences to detect:
+- Regions with inconsistent error levels (selective manipulation)
+- Areas with abnormally low error (AI insertions)
+- Edges with inconsistent error (splicing, copy-move)
+- Uniform error patterns (full AI generation)
 
-### 4. **Análise com Gemini AI**
-Integra a API do Google Gemini para análise contextual avançada:
-- Interpreta os resultados das análises técnicas
-- Fornece explicação em linguagem acessível para não-técnicos
-- Gera veredicto final com nível de confiança
-- Identifica indicadores-chave em formato simples
+### 4. **Analysis with Gemini AI**
+Integrates the Google Gemini API for advanced contextual analysis:
+- Interprets results from technical analyses
+- Provides explanations in accessible language for non-technical users
+- Generates a final verdict with a confidence level
+- Identifies key indicators in a simple format
 
-### 5. **Imagens Anotadas**
-Gera visualizações anotadas que destacam:
-- Áreas suspeitas identificadas por cada método
-- Mapas de calor de anomalias
-- Score de risco por região
+### 5. **Annotated Images**
+Generates annotated visualizations that highlight:
+- Suspicious areas identified by each method
+- Anomaly heatmaps
+- Risk score per region
 
 ---
 
-## 🔧 Arquitetura Técnica
+## 🔧 Technical Architecture
 
-### Tecnologias Utilizadas
+### Technologies Used
 - **Framework:** FastAPI 0.109.0
-- **Processamento de Imagens:** OpenCV, NumPy, Pillow
-- **Análise Científica:** SciPy
-- **IA Generativa:** Google Gemini (google-genai 0.3.0)
-- **Autenticação:** JWT (PyJWT)
+- **Image Processing:** OpenCV, NumPy, Pillow
+- **Scientific Analysis:** SciPy
+- **Generative AI:** Google Gemini (google-genai 0.3.0)
+- **Authentication:** JWT (PyJWT)
 - **Rate Limiting:** SlowAPI
-- **Servidor:** Uvicorn
+- **Server:** Uvicorn
 
-### Estrutura do Projeto
+### Project Structure
 ```
 forense-ai/
 ├── app/
-│   ├── main.py                       # Endpoints da API
+│   ├── main.py                       # API Endpoints
 │   ├── services/
-│   │   ├── analysis_service.py       # Orquestração de análises + Gemini
-│   │   └── image_annotator.py        # Geração de imagens anotadas
+│   │   ├── analysis_service.py       # Analysis Orchestration + Gemini
+│   │   └── image_annotator.py        # Annotated Image Generation
 │   ├── analyzers/
-│   │   ├── noise.py                  # Análise de ruído
-│   │   ├── fft.py                    # Análise FFT
+│   │   ├── noise.py                  # Noise Analysis
+│   │   ├── fft.py                    # FFT Analysis
 │   │   └── ela.py                    # Error Level Analysis
 │   ├── middleware/
-│   │   ├── anonymous_auth.py         # Sistema JWT anônimo
-│   │   ├── auth.py                   # Autenticação por API Key
-│   │   ├── rate_limiter.py           # Rate limiting dinâmico
-│   │   ├── quota.py                  # Sistema de quotas
-│   │   ├── cost_tracker.py           # Rastreamento de custos Gemini
-│   │   └── captcha.py                # Verificação reCAPTCHA (opcional)
-│   └── utils.py                      # Validação e utilitários
-├── uploads/                          # Diretório temporário para uploads
-├── cost_tracking.json                # Registro de custos (auto-gerado)
-├── .env                              # Variáveis de ambiente
-├── requirements.txt
-├── Dockerfile
-└── README.md
+│   │   ├── anonymous_auth.py         # Anonymous JWT System
+│   │   ├── auth.py                   # API Key Authentication
+│   │   ├── rate_limiter.py           # Dynamic Rate Limiting
+│   │   ├── quota.py                  # Quota System
+│   │   ├── cost_tracker.py           # Gemini Cost Tracking
+│   │   └── captcha.py                # reCAPTCHA Verification (optional)
+│   └── utils.py                      # Validation and Utilities
+├── uploads/                          # Temporary directory for uploads
+├── cost_tracking.json                # Cost registration (auto-generated)
+├── .env                              # Environment variables
+├── requirements.txt                  # Python dependencies
+├── Dockerfile                        # Docker configuration
+└── README.md                         # This documentation
 ```
 
 ---
 
-## 🔐 Autenticação
+## 🔐 Authentication
 
-A API v2.0 oferece **2 modos de autenticação flexíveis**:
+API v2.0 offers **2 flexible authentication modes**:
 
-### Opção 1: API Key (Recomendado para Integração)
+### Option 1: API Key (Recommended for Integration)
 
-**Vantagens:**
-- ✅ Sem limitações de sessão anônima
-- ✅ Quotas personalizadas por cliente
-- ✅ Rate limits mais altos
-- ✅ Ideal para aplicações em produção
+**Advantages:**
+- ✅ No anonymous session limitations
+- ✅ Personalized quotas per client
+- ✅ Higher rate limits
+- ✅ Ideal for production applications
 
-**Como usar:**
+**How to use:**
 ```bash
 curl -X POST "http://localhost:8001/api/analyze-image" \
   -H "X-API-Key: aidet_demo_hackathon_2026" \
-  -F "file=@imagem.jpg"
+  -F "file=@image.jpg"
 ```
 
-**API Key Demo (para testes):**
-- **Chave:** `aidet_demo_hackathon_2026`
-- **Rate Limit:** 20 req/min, 200 req/hora
-- **Quota:** Ilimitada
+**Demo API Key (for testing):**
+- **Key:** `aidet_demo_hackathon_2026`
+- **Rate Limit:** 20 req/min, 200 req/hour
+- **Quota:** Unlimited
 
-### Opção 2: Token Anônimo (Acesso Público)
+### Option 2: Anonymous Token (Public Access)
 
-**Vantagens:**
-- ✅ Sem necessidade de cadastro
-- ✅ Acesso imediato
-- ✅ Ideal para testes e demos públicas
+**Advantages:**
+- ✅ No registration required
+- ✅ Immediate access
+- ✅ Ideal for tests and public demos
 
-**Limitações (sem chave Gemini própria):**
-- 📊 50 requisições por sessão
-- 📊 5.000 créditos de quota
-- 📊 3 requisições/minuto
+**Limitations (without own Gemini key):**
+- 📊 50 requests per session
+- 📊 5,000 quota credits
+- 📊 3 requests/minute
 
-**Limitações (COM chave Gemini própria):**
-- 📊 200 requisições por sessão (4x mais!)
-- 📊 Quota ilimitada
-- 📊 20 requisições/minuto (6x mais!)
+**Limitations (WITH own Gemini key):**
+- 📊 200 requests per session (4x more!)
+- 📊 Unlimited quota
+- 📊 20 requests/minute (6x more!)
 
-**Fluxo de uso:**
+**Usage Workflow:**
 
 ```bash
-# 1. Obter tokens (access + refresh)
+# 1. Get tokens (access + refresh)
 TOKEN_DATA=$(curl -X POST "http://localhost:8001/api/auth/anonymous")
 ACCESS_TOKEN=$(echo $TOKEN_DATA | jq -r .access_token)
 REFRESH_TOKEN=$(echo $TOKEN_DATA | jq -r .refresh_token)
 
-# 2. Usar access token (válido por 1h)
+# 2. Use access token (valid for 1h)
 curl -X POST "http://localhost:8001/api/analyze-image" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -F "file=@imagem.jpg"
+  -F "file=@image.jpg"
 
-# 3. Renovar quando expirar (após 1h)
+# 3. Renew when expired (after 1h)
 NEW_TOKENS=$(curl -X POST "http://localhost:8001/api/auth/refresh" \
   -H "X-Refresh-Token: $REFRESH_TOKEN")
 ```
 
 ---
 
-## 🚀 Como Executar
+## 🚀 How to Run
 
-### Pré-requisitos
+### Prerequisites
 - Python 3.10+
-- Variável de ambiente `GEMINI_API_KEY` (para análise Gemini do servidor)
-- Arquivo `.env` configurado
+- `GEMINI_API_KEY` environment variable (for server-side Gemini analysis)
+- Configured `.env` file
 
-### Instalação
+### Installation
 
 ```bash
-# 1. Clonar repositório
+# 1. Clone repository
 git clone <repo-url>
 cd forense-ai
 
-# 2. Criar ambiente virtual
+# 2. Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# ou
+# or
 venv\Scripts\activate  # Windows
 
-# 3. Instalar dependências
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Criar arquivo .env (ver seção abaixo)
+# 4. Create .env file (see section below)
 ```
 
-### Configuração do `.env`
+### `.env` Configuration
 
-Crie um arquivo `.env` na raiz do projeto:
+Create a `.env` file in the project root:
 
 ```env
 # ========================================
-# AUTENTICAÇÃO
+# AUTHENTICATION
 # ========================================
 
-# Chaves de API válidas (separadas por vírgula)
+# Valid API Keys (comma-separated)
 API_KEYS=aidet_demo_hackathon_2026,aidet_prod_key_xyz123
 
-# Chaves premium (quotas maiores)
+# Premium keys (higher quotas)
 PREMIUM_API_KEYS=aidet_prod_key_xyz123
 
-# Secret para JWT (gere com: openssl rand -hex 32)
-JWT_SECRET=sua_chave_secreta_muito_longa_e_aleatoria_aqui
+# JWT Secret (generate with: openssl rand -hex 32)
+JWT_SECRET=your_very_long_and_random_secrey_key_here
 
-# Tempo de vida dos tokens anônimos
+# Anonymous token lifetime
 ACCESS_TOKEN_LIFETIME_MINUTES=60
 SESSION_LIFETIME_DAYS=7
 
 # ========================================
-# QUOTAS E LIMITES
+# QUOTAS AND LIMITS
 # ========================================
 
-# Quotas diárias por tier
+# Daily quotas per tier
 FREE_TIER_DAILY_LIMIT=10
 PREMIUM_TIER_DAILY_LIMIT=100
 
-# Limites de sessões anônimas SEM chave Gemini própria
+# Anonymous session limits WITHOUT own Gemini key
 ANON_REQUESTS_LIMIT=50
 ANON_QUOTA_LIMIT=5000
 
-# Limites de sessões anônimas COM chave Gemini própria
+# Anonymous session limits WITH own Gemini key
 ANON_REQUESTS_LIMIT_CUSTOM_KEY=200
-ANON_QUOTA_LIMIT_CUSTOM_KEY=0  # 0 = ilimitado
+ANON_QUOTA_LIMIT_CUSTOM_KEY=0  # 0 = unlimited
 
 # ========================================
 # RATE LIMITING
 # ========================================
 
-# Análise completa (com Gemini)
+# Full Analysis (with Gemini)
 RATE_LIMIT_ANALYZE_SERVER_KEY=3/minute
 RATE_LIMIT_ANALYZE_CUSTOM_KEY=20/minute
 
-# Análises individuais (FFT, NOISE, ELA)
+# Individual Analyses (FFT, NOISE, ELA)
 RATE_LIMIT_INDIVIDUAL_SERVER_KEY=10/minute
 RATE_LIMIT_INDIVIDUAL_CUSTOM_KEY=30/minute
 
 # ========================================
-# PROTEÇÃO ANTI-ABUSO
+# ANTI-ABUSE PROTECTION
 # ========================================
 
-# Limite de criação de sessões por IP
+# Session creation limits per IP
 MAX_SESSIONS_PER_IP_HOUR=3
 MAX_SESSIONS_PER_IP_DAY=10
 MAX_ACTIVE_SESSIONS_PER_IP=5
@@ -243,15 +243,15 @@ MAX_ACTIVE_SESSIONS_PER_IP=5
 # GOOGLE GEMINI
 # ========================================
 
-# Chave da API Gemini do SERVIDOR (opcional)
-GEMINI_API_KEY=sua_chave_gemini_aqui
+# SERVER Gemini API Key (optional)
+GEMINI_API_KEY=your_gemini_key_here
 
-# Budget caps (proteção de custos)
+# Budget caps (cost protection)
 MAX_DAILY_GEMINI_COST=5.0
 MAX_MONTHLY_GEMINI_COST=50.0
 
 # ========================================
-# reCAPTCHA (Opcional)
+# reCAPTCHA (Optional)
 # ========================================
 
 # Enforcement: "required", "optional", "disabled"
@@ -260,15 +260,15 @@ RECAPTCHA_SECRET_KEY=
 RECAPTCHA_MIN_SCORE=0.5
 ```
 
-### Execução Local
+### Local Execution
 
 ```bash
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-A API estará disponível em: `http://localhost:8001`
+The API will be available at: `http://localhost:8001`
 
-Documentação interativa (Swagger): `http://localhost:8001/docs`
+Interactive documentation (Swagger): `http://localhost:8001/docs`
 
 ### Docker
 
@@ -282,12 +282,12 @@ docker run -p 8001:8001 --env-file .env forense-ai
 
 ---
 
-## 🌐 Endpoints da API
+## 🌐 API Endpoints
 
-### 🔐 Autenticação
+### 🔐 Authentication
 
 #### **POST /api/auth/anonymous**
-Gera tokens JWT para acesso anônimo (sem cadastro).
+Generates JWT tokens for anonymous access (no registration required).
 
 **Request:**
 ```bash
@@ -309,12 +309,12 @@ curl -X POST "http://localhost:8001/api/auth/anonymous"
     "default": {
       "requests_limit": 50,
       "quota_limit": 5000,
-      "description": "Limites ao usar chave Gemini do servidor"
+      "grad_description": "Limits when using server Gemini key"
     },
     "custom_key": {
       "requests_limit": 200,
       "quota_limit": "unlimited",
-      "description": "Limites ao usar sua própria chave Gemini (X-Gemini-Key)"
+      "grad_description": "Limits when using your own Gemini key (X-Gemini-Key)"
     },
     "current_usage": {
       "requests_used": 0,
@@ -327,7 +327,7 @@ curl -X POST "http://localhost:8001/api/auth/anonymous"
 ---
 
 #### **POST /api/auth/refresh**
-Renova access token usando refresh token.
+Refreshes the access token using the refresh token.
 
 **Request:**
 ```bash
@@ -338,22 +338,22 @@ curl -X POST "http://localhost:8001/api/auth/refresh" \
 **Response (200):**
 ```json
 {
-  "access_token": "novo_access_token_aqui",
-  "refresh_token": "novo_refresh_token_aqui",
+  "access_token": "new_access_token_here",
+  "refresh_token": "new_refresh_token_here",
   "token_type": "Bearer",
   "access_expires_in": 3600,
   ...
 }
 ```
 
-**Erros:**
-- `401 Unauthorized` - Refresh token expirado ou inválido
-- `401 Unauthorized` - Sessão não encontrada
+**Errors:**
+- `401 Unauthorized` - Refresh token expired or invalid
+- `401 Unauthorized` - Session not found
 
 ---
 
 #### **GET /api/auth/session**
-Consulta estatísticas da sessão anônima atual.
+Check current anonymous session statistics.
 
 **Request:**
 ```bash
@@ -376,7 +376,7 @@ curl -X GET "http://localhost:8001/api/auth/session" \
     "created_at": "2026-02-09T10:00:00",
     "session_age_hours": 3.45,
     "limit_type": "server_key",
-    "tip": "Use header X-Gemini-Key com sua chave para limites maiores"
+    "tip": "Use X-Gemini-Key header with your own key for higher limits"
   }
 }
 ```
@@ -384,7 +384,7 @@ curl -X GET "http://localhost:8001/api/auth/session" \
 ---
 
 #### **DELETE /api/auth/session**
-Encerra a sessão anônima atual.
+Ends the current anonymous session.
 
 **Request:**
 ```bash
@@ -395,7 +395,7 @@ curl -X DELETE "http://localhost:8001/api/auth/session" \
 **Response (200):**
 ```json
 {
-  "message": "Sessão encerrada com sucesso",
+  "message": "Session ended successfully",
   "session_id": "anon_a1b2c3d4e5f6",
   "stats": {
     "requests_used": 15,
@@ -406,37 +406,37 @@ curl -X DELETE "http://localhost:8001/api/auth/session" \
 
 ---
 
-### 🔍 Análise de Imagens
+### 🔍 Image Analysis
 
-#### **POST /api/analyze-image** ⭐ (Endpoint Principal)
-Executa análise COMPLETA consolidada (FFT + NOISE + ELA + Gemini).
+#### **POST /api/analyze-image** ⭐ (Primary Endpoint)
+Executes consolidated FULL analysis (FFT + NOISE + ELA + Gemini).
 
-**Autenticação (escolha UMA):**
+**Authentication (choose ONE):**
 
-**Opção 1 - API Key:**
+**Option 1 - API Key:**
 ```bash
 curl -X POST "http://localhost:8001/api/analyze-image" \
   -H "X-API-Key: aidet_demo_hackathon_2026" \
-  -F "file=@imagem.jpg"
+  -F "file=@image.jpg"
 ```
 
-**Opção 2 - Token Anônimo:**
+**Option 2 - Anonymous Token:**
 ```bash
 curl -X POST "http://localhost:8001/api/analyze-image" \
   -H "Authorization: Bearer <access_token>" \
-  -F "file=@imagem.jpg"
+  -F "file=@image.jpg"
 ```
 
-**Headers Opcionais:**
-- `X-Gemini-Key` - Sua chave Gemini (aumenta limites e usa seus créditos)
-- `X-Captcha-Token` - Token reCAPTCHA (se CAPTCHA estiver habilitado)
+**Optional Headers:**
+- `X-Gemini-Key` - Your Gemini key (increases limits and uses your credits)
+- `X-Captcha-Token` - reCAPTCHA token (if enabled)
 
 **Response (200):**
 ```json
 {
   "automated_analysis": {
     "final_score": 0.72,
-    "interpretation": "Provavelmente IA",
+    "interpretation": "Probably AI",
     "confidence": "high",
     "methods_used": ["FFT", "NOISE", "ELA"],
     "individual_scores": {
@@ -445,26 +445,26 @@ curl -X POST "http://localhost:8001/api/analyze-image" \
       "ela": 0.68
     },
     "key_evidence": [
-      "NOISE: Ruído sintético detectado (consistency=0.85)",
-      "ELA: Uniformidade excessiva (mean_error=0.012)"
+      "NOISE: Synthetic noise detected (consistency=0.85)",
+      "ELA: Excessive uniformity (mean_error=0.012)"
     ],
-    "recommendation": "⚠️ ANÁLISE MANUAL - Evidências ambíguas"
+    "recommendation": "⚠️ MANUAL ANALYSIS - Ambiguous evidence"
   },
   "gemini_analysis": {
-    "verdict": "IA",
-    "full_analysis": "Texto completo da análise do Gemini...",
-    "explanation": "Esta imagem apresenta características típicas...",
+    "verdict": "AI",
+    "full_analysis": "Full text of Gemini analysis...",
+    "explanation": "This image presents typical characteristics...",
     "confidence": "high",
     "key_indicators": [
-      "Padrão de ruído uniforme típico de geradores",
-      "Ausência de artefatos de compressão JPEG natural"
+      "Uniform noise pattern typical of generators",
+      "Absence of natural JPEG compression artifacts"
     ]
   },
   "annotated_image": "base64_encoded_annotated_image",
   "details": {
-    "fft": { /* Resultado completo do FFT */ },
-    "noise": { /* Resultado completo do NOISE */ },
-    "ela": { /* Resultado completo do ELA */ }
+    "fft": { /* Full FFT results */ },
+    "noise": { /* Full NOISE results */ },
+    "ela": { /* Full ELA results */ }
   },
   "session_usage": {
     "requests_used": 13,
@@ -477,90 +477,90 @@ curl -X POST "http://localhost:8001/api/analyze-image" \
 ```
 
 **Rate Limits:**
-- **API Key demo:** 20 req/min
-- **Token anônimo (sem chave Gemini):** 3 req/min
-- **Token anônimo (com chave Gemini):** 20 req/min
+- **Demo API Key:** 20 req/min
+- **Anonymous token (without Gemini key):** 3 req/min
+- **Anonymous token (with Gemini key):** 20 req/min
 
-**Erros:**
-- `401 Unauthorized` - Token/API key inválido ou ausente
-- `429 Too Many Requests` - Rate limit ou quota excedida
-- `400 Bad Request` - Arquivo inválido
-- `500 Internal Server Error` - Erro na análise
+**Errors:**
+- `401 Unauthorized` - Invalid or missing Token/API key
+- `429 Too Many Requests` - Rate limit or quota exceeded
+- `400 Bad Request` - Invalid file
+- `500 Internal Server Error` - Analysis error
 
 ---
 
-## 📊 Tabela Comparativa de Limites
+## 📊 Limits Comparison Table
 
-| Característica | API Key Demo | Token Anônimo (Servidor) | Token Anônimo (Chave Própria) |
+| Feature | Demo API Key | Anonymous Token (Server) | Anonymous Token (Own Key) |
 |---|---|---|---|
-| **Autenticação** | `X-API-Key: aidet_demo_...` | `Authorization: Bearer ...` | `Authorization: Bearer ...` + `X-Gemini-Key` |
-| **Requisições/sessão** | Ilimitadas | 50 | 200 |
-| **Quota de créditos** | Ilimitada | 5.000 | Ilimitada |
+| **Authentication** | `X-API-Key: aidet_demo_...` | `Authorization: Bearer ...` | `Authorization: Bearer ...` + `X-Gemini-Key` |
+| **Requests/session** | Unlimited | 50 | 200 |
+| **Credit Quota** | Unlimited | 5,000 | Unlimited |
 | **Rate Limit** | 20 req/min | 3 req/min | 20 req/min |
-| **Duração da sessão** | Permanente | 7 dias | 7 dias |
-| **Custo Gemini** | Servidor | Servidor | Cliente |
-| **Budget cap** | N/A | $5/dia, $50/mês | N/A |
-| **Ideal para** | Integração prod | Testes rápidos | Uso intenso |
+| **Session Duration** | Permanent | 7 days | 7 days |
+| **Gemini Cost** | Server | Server | Client |
+| **Budget cap** | N/A | $5/day, $50/month | N/A |
+| **Ideal for** | Prod Integration | Quick tests | Intense usage |
 
 ---
 
-## 🛡️ Proteção Anti-Abuso
+## 🛡️ Anti-Abuse Protection
 
-### Limites por IP (Sessões Anônimas)
+### IP Limits (Anonymous Sessions)
 
-**Por hora:**
-- Máximo 3 novas sessões criadas por IP
+**PerHour:**
+- Maximum 3 new sessions created per IP
 
-**Por dia:**
-- Máximo 10 novas sessões criadas por IP
-- Máximo 5 sessões ativas simultâneas por IP
+**PerDay:**
+- Maximum 10 new sessions created per IP
+- Maximum 5 simultaneous active sessions per IP
 
-**Sessões ativas:**
-- Sessões são limpas automaticamente após 7 dias
-- Use `DELETE /api/auth/session` para encerrar manualmente
+**Active Sessions:**
+- Sessions are automatically cleared after 7 days
+- Use `DELETE /api/auth/session` to end manually
 
 **Bypass:**
-- Use API Key para evitar limites de criação de sessões
+- Use API Key to avoid session creation limits
 
 ---
 
-## 💰 Sistema de Custos e Quotas
+## 💰 Cost and Quota System
 
-### Budget Caps (Chave Gemini do Servidor)
+### Budget Caps (Server Gemini Key)
 
-Proteção automática de custos quando clientes usam a chave Gemini do servidor:
+Automatic cost protection when clients use the server's Gemini key:
 
-- **Limite diário:** $5.00 USD
-- **Limite mensal:** $50.00 USD
-- **Custo por requisição:** ~$0.002 USD
+- **Daily limit:** $5.00 USD
+- **Monthly limit:** $50.00 USD
+- **Cost per request:** ~$0.002 USD
 
-**Arquivo de rastreamento:** `cost_tracking.json` (auto-gerado)
+**Tracking file:** `cost_tracking.json` (auto-generated)
 
-**Limpeza automática:**
-- Mantém últimos 7 dias de dados diários
-- Mantém últimos 3 meses de dados mensais
+**Automatic cleanup:**
+- Keeps the last 7 days of daily data
+- Keeps the last 3 months of monthly data
 
 **Bypass:**
-- Use `X-Gemini-Key` com sua chave para evitar budget cap do servidor
+- Use `X-Gemini-Key` with your own key to avoid server budget cap
 
 ---
 
-## 🧪 Casos de Uso
+## 🧪 Use Cases
 
-### 1. Teste Rápido (Sem Cadastro)
+### 1. Quick Test (No Registration)
 
 ```bash
-# 1. Obter token
+# 1. Get token
 TOKEN=$(curl -s -X POST "http://localhost:8001/api/auth/anonymous" | jq -r .access_token)
 
-# 2. Analisar imagem
+# 2. Analyze image
 curl -X POST "http://localhost:8001/api/analyze-image" \
   -H "Authorization: Bearer $TOKEN" \
-  -F "file=@foto_suspeita.jpg" \
+  -F "file=@suspicious_photo.jpg" \
   | jq .automated_analysis.interpretation
 ```
 
-### 2. Integração em Produção
+### 2. Production Integration
 
 ```python
 import requests
@@ -582,77 +582,77 @@ def analyze_image(image_path):
     else:
         raise Exception(f"Error: {response.status_code}")
 
-# Uso
-verdict = analyze_image("imagem.jpg")
-print(f"Veredicto: {verdict}")
+# Usage
+verdict = analyze_image("image.jpg")
+print(f"Verdict: {verdict}")
 ```
 
-### 3. Usando Chave Gemini Própria (Limites Maiores)
+### 3. Using Own Gemini Key (Higher Limits)
 
 ```bash
-# Obter token anônimo
+# Get anonymous token
 TOKEN=$(curl -s -X POST "http://localhost:8001/api/auth/anonymous" | jq -r .access_token)
 
-# Analisar com sua chave Gemini (200 req/sessão ao invés de 50!)
+# Analyze with your own Gemini key (200 req/session instead of 50!)
 curl -X POST "http://localhost:8001/api/analyze-image" \
   -H "Authorization: Bearer $TOKEN" \
-  -H "X-Gemini-Key: SUA_CHAVE_GEMINI_AQUI" \
-  -F "file=@imagem.jpg"
+  -H "X-Gemini-Key: YOUR_GEMINI_KEY_HERE" \
+  -F "file=@image.jpg"
 ```
 
 ---
 
-## 📊 Interpretando Resultados
+## 📊 Interpreting Results
 
 ### Risk Score (0.0 - 1.0)
-- **0.00 - 0.15:** Muito provavelmente REAL
-- **0.15 - 0.35:** Provavelmente REAL
-- **0.35 - 0.55:** INCONCLUSIVO - Análise manual recomendada
-- **0.55 - 0.75:** Provavelmente IA
-- **0.75 - 1.00:** Muito provavelmente IA
+- **0.00 - 0.15:** Very likely REAL
+- **0.15 - 0.35:** Probably REAL
+- **0.35 - 0.55:** INCONCLUSIVE - Manual analysis recommended
+- **0.55 - 0.75:** Probably AI
+- **0.75 - 1.00:** Very likely AI
 
 ### Confidence Levels
-- **very_high:** Todos os 3 métodos concordam + score distante da zona cinzenta
-- **high:** Todos os métodos analisaram + resultados consistentes
-- **medium:** Alguns métodos falharam ou resultados parcialmente conflitantes
-- **low:** Apenas 1-2 métodos funcionaram
-- **very_low:** Análise comprometida ou dados insuficientes
+- **very_high:** All 3 methods agree + score far from grey area
+- **high:** All methods analyzed + consistent results
+- **medium:** Some methods failed or partial conflicting results
+- **low:** Only 1-2 methods worked
+- **very_low:** Analysis compromised or insufficient data
 
 ### Gemini Verdict
-- **REAL:** Imagem autêntica, capturada por câmera
-- **IA:** Imagem gerada ou manipulada por IA
-- **INCONCLUSIVO:** Evidências conflitantes ou insuficientes
-- **DISABLED:** Gemini não configurado
-- **ERROR:** Erro na análise Gemini
+- **REAL:** Authentic image, captured by camera
+- **AI:** Image generated or manipulated by AI
+- **INCONCLUSIVE:** Conflicting or insufficient evidence
+- **DISABLED:** Gemini not configured
+- **ERROR:** Error in Gemini analysis
 
 ---
 
-## ⚠️ Limitações
+## ⚠️ Limitations
 
-1. **Gemini Desabilitado sem API Key**
-   - Se `GEMINI_API_KEY` não estiver configurada E cliente não enviar `X-Gemini-Key`, o campo `gemini_analysis.verdict` será `"DISABLED"`
+1. **Gemini Disabled without API Key**
+   - If `GEMINI_API_KEY` is not configured AND the client doesn't send `X-Gemini-Key`, the `gemini_analysis.verdict` field will be `"DISABLED"`.
 
-2. **Formatos de Imagem**
-   - ELA funciona melhor com imagens JPEG (imagens PNG são convertidas temporariamente)
+2. **Image Formats**
+   - ELA works best with JPEG images (PNG images are temporarily converted).
 
-3. **Imagens Muito Comprimidas**
-   - Compressão pesada pode gerar falsos positivos em todos os métodos
+3. **Heavily Compressed Images**
+   - Heavy compression can generate false positives in all methods.
 
-4. **Screenshots e Edições Legítimas**
-   - Capturas de tela e edições básicas (crop, resize) podem ser marcadas como suspeitas
+4. **Screenshots and Legitimate Edits**
+   - Screenshots and basic edits (crop, resize) may be flagged as suspicious.
 
 5. **Budget Caps**
-   - Ao usar chave Gemini do servidor, há limites de $5/dia e $50/mês
-   - Use sua própria chave (`X-Gemini-Key`) para evitar esses limites
+   - When using the server's Gemini key, there are limits of $5/day and $50/month.
+   - Use your own key (`X-Gemini-Key`) to avoid these limits.
 
 ---
 
-## 🔧 Configurações Avançadas
+## 🔧 Advanced Configuration
 
-### Variáveis de Ambiente Completas
+### Full Environment Variables
 
 ```env
-# Autenticação
+# Authentication
 API_KEYS=key1,key2,key3
 PREMIUM_API_KEYS=key2
 JWT_SECRET=generate_with_openssl_rand_hex_32
@@ -673,7 +673,7 @@ RATE_LIMIT_ANALYZE_CUSTOM_KEY=20/minute
 RATE_LIMIT_INDIVIDUAL_SERVER_KEY=10/minute
 RATE_LIMIT_INDIVIDUAL_CUSTOM_KEY=30/minute
 
-# Anti-Abuso
+# Anti-Abuse
 MAX_SESSIONS_PER_IP_HOUR=3
 MAX_SESSIONS_PER_IP_DAY=10
 MAX_ACTIVE_SESSIONS_PER_IP=5
@@ -683,7 +683,7 @@ GEMINI_API_KEY=your_key_here
 MAX_DAILY_GEMINI_COST=5.0
 MAX_MONTHLY_GEMINI_COST=50.0
 
-# reCAPTCHA (Opcional)
+# reCAPTCHA (Optional)
 CAPTCHA_ENFORCEMENT=optional  # required, optional, disabled
 RECAPTCHA_SECRET_KEY=
 RECAPTCHA_MIN_SCORE=0.5
@@ -693,42 +693,42 @@ RECAPTCHA_MIN_SCORE=0.5
 
 ## 🐛 Troubleshooting
 
-### Erro: "Limite de sessões atingido"
+### Error: "Session limit reached"
 
-**Causa:** IP criou muitas sessões em pouco tempo (proteção anti-abuso).
+**Cause:** IP created too many sessions in a short time (anti-abuse protection).
 
-**Soluções:**
-1. Aguarde 1 hora (reset automático)
-2. Use API Key demo (`X-API-Key: aidet_demo_hackathon_2026`)
-3. Encerre sessões antigas: `DELETE /api/auth/session`
+**Solutions:**
+1. Wait 1 hour (automatic reset)
+2. Use demo API Key (`X-API-Key: aidet_demo_hackathon_2026`)
+3. End old sessions: `DELETE /api/auth/session`
 
-### Erro: "Budget cap atingido"
+### Error: "Budget cap reached"
 
-**Causa:** Limites de custo Gemini do servidor excedidos ($5/dia ou $50/mês).
+**Cause:** Server Gemini cost limits exceeded ($5/day or $50/month).
 
-**Soluções:**
-1. Use sua própria chave Gemini: `-H "X-Gemini-Key: SUA_CHAVE"`
-2. Aguarde reset (meia-noite UTC para diário)
-3. Aumente limites no `.env` se você administra o servidor
+**Solutions:**
+1. Use your own Gemini key: `-H "X-Gemini-Key: YOUR_KEY"`
+2. Wait for reset (Midnight UTC for daily)
+3. Increase limits in `.env` if you manage the server
 
-### Erro: "Token expirado"
+### Error: "Token expired"
 
-**Causa:** Access token válido por 1h expirou.
+**Cause:** 1h access token has expired.
 
-**Solução:**
+**Solution:**
 ```bash
-# Renovar com refresh token
+# Renew with refresh token
 curl -X POST "/api/auth/refresh" \
-  -H "X-Refresh-Token: SEU_REFRESH_TOKEN"
+  -H "X-Refresh-Token: YOUR_REFRESH_TOKEN"
 ```
 
-### Erro: "Sessão não encontrada"
+### Error: "Session not found"
 
-**Causa:** Sessão expirou (7 dias) ou foi encerrada.
+**Cause:** Session expired (7 days) or was terminated.
 
-**Solução:**
+**Solution:**
 ```bash
-# Criar nova sessão
+# Create new session
 curl -X POST "/api/auth/anonymous"
 ```
 
@@ -737,41 +737,41 @@ curl -X POST "/api/auth/anonymous"
 ## 📝 Changelog
 
 ### v2.0 (2026-02-09)
-- ✅ Sistema de autenticação anônima com JWT
-- ✅ Limites dinâmicos baseados em chave Gemini própria
-- ✅ Proteção anti-abuso por IP
-- ✅ Sistema de quotas e cost tracking
-- ✅ Rate limiting inteligente
-- ✅ Suporte a reCAPTCHA (opcional)
+- ✅ Anonymous authentication system with JWT
+- ✅ Dynamic limits based on own Gemini key
+- ✅ Anti-abuse protection per IP
+- ✅ Quota system and cost tracking
+- ✅ Smart rate limiting
+- ✅ reCAPTCHA support (optional)
 
 ### v1.0 (2025-12-01)
-- ✅ Análises forenses: FFT, NOISE, ELA
-- ✅ Integração com Gemini AI
-- ✅ Geração de imagens anotadas
-- ✅ API básica com FastAPI
+- ✅ Forensic analyses: FFT, NOISE, ELA
+- ✅ Gemini AI integration
+- ✅ Annotated image generation
+- ✅ Basic API with FastAPI
 
 ---
 
-## 📧 Contato e Suporte
+## 📧 Contact and Support
 
-- **Documentação Interativa:** `/docs` (Swagger UI)
+- **Interactive Documentation:** `/docs` (Swagger UI)
 - **Health Check:** `/health`
-- **Repositório:** [GitHub](https://github.com/seu-repo)
+- **Repository:** [GitHub](https://github.com/your-repo)
 
 ---
 
-## 📄 Licença
+## 📄 License
 
-Este projeto é fornecido como está, sem garantias. Use por sua conta e risco.
+This project is provided as-is, without warranties. Use at your own risk.
 
 ---
 
-## 🤝 Contribuições
+## 🤝 Contributions
 
-Contribuições são bem-vindas! Áreas de melhoria:
-- Novos métodos de análise (DWT, CFA, Metadata Analysis)
-- Melhorias nos limiares de detecção
-- Suporte a vídeos e GIFs
-- Interface web para upload
-- Sistema de cache de análises
-- Integração com Redis para quotas distribuídas
+Contributions are welcome! Areas for improvement:
+- New analysis methods (DWT, CFA, Metadata Analysis)
+- Improvements in detection thresholds
+- Support for videos and GIFs
+- Web interface for upload
+- Analysis caching system
+- Redis integration for distributed quotas
