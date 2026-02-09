@@ -1,24 +1,3 @@
-# app/middleware/anonymous_auth.py
-
-import jwt
-import uuid
-import os
-from datetime import datetime, timedelta
-from fastapi import HTTPException, Header, Request
-from typing import Optional
-
-
-# app/middleware/anonymous_auth.py
-
-import jwt
-import uuid
-import os
-from datetime import datetime, timedelta
-from fastapi import HTTPException, Header, Request
-from typing import Optional
-
-# app/middleware/anonymous_auth.py
-
 import jwt
 import uuid
 import os
@@ -29,62 +8,68 @@ from fastapi import HTTPException, Header, Request
 from typing import Optional
 
 
+
 class AnonymousAuthManager:
-    """Gera tokens JWT para usuários anônimos com renovação automática, limites dinâmicos e proteção anti-abuso"""
+    """
+    Gera tokens JWT para usuários anônimos com renovação automática,
+    limites dinâmicos e proteção anti-abuso.
+    Generates JWT tokens for anonymous users with auto-renewal,
+    dynamic limits, and anti-abuse protection.
+    """
     
     def __init__(self):
         self.secret = os.getenv("JWT_SECRET")
         if not self.secret:
             raise ValueError("JWT_SECRET não configurado no .env")
         
-        # Token curto (access)
+        # Token curto (access) / Short-lived access token
         self.access_token_lifetime = int(os.getenv("ACCESS_TOKEN_LIFETIME_MINUTES", "60"))
         
-        # Sessão longa (refresh)
+        # Sessão longa (refresh) / Long-lived session (refresh)
         self.session_lifetime_days = int(os.getenv("SESSION_LIFETIME_DAYS", "7"))
         
         self.algorithm = "HS256"
         
-        # Armazenar sessões anônimas (em produção, usar Redis)
+        # Armazenar sessões anônimas (usar Redis em produção)
+        # Store anonymous sessions (use Redis in production)
         self.anonymous_sessions = {}
         
-        # Limites SEM chave Gemini própria (servidor paga)
+        # Limites SEM chave Gemini própria / Limits WITHOUT own Gemini key
         self.default_requests_limit = int(os.getenv("ANON_REQUESTS_LIMIT", "50"))
         self.default_quota_limit = int(os.getenv("ANON_QUOTA_LIMIT", "5000"))
         
-        # Limites COM chave Gemini própria (cliente paga)
+        # Limites COM chave Gemini própria / Limits WITH own Gemini key
         self.custom_key_requests_limit = int(os.getenv("ANON_REQUESTS_LIMIT_CUSTOM_KEY", "200"))
         self.custom_key_quota_limit = int(os.getenv("ANON_QUOTA_LIMIT_CUSTOM_KEY", "0"))  # 0 = ilimitado
         
-        # ✅ PROTEÇÃO 1: Rastrear criação de sessões por IP
-        self.session_creation_tracker = {}  # {ip: [timestamps]}
+        # Proteção 1: Rastrear criação de sessões por IP
+        # Protection 1: Track session creation per IP
+        self.session_creation_tracker = {}
         self.max_sessions_per_ip_per_hour = int(os.getenv("MAX_SESSIONS_PER_IP_HOUR", "3"))
         self.max_sessions_per_ip_per_day = int(os.getenv("MAX_SESSIONS_PER_IP_DAY", "10"))
         
-        # ✅ PROTEÇÃO 2: Limite de sessões ativas simultâneas
+        # Proteção 2: Limite de sessões ativas simultâneas
+        # Protection 2: Concurrent active sessions limit
         self.max_active_sessions_per_ip = int(os.getenv("MAX_ACTIVE_SESSIONS_PER_IP", "5"))
         
-        print(f"✅ Anonymous Auth inicializado | Access: {self.access_token_lifetime}min | Session: {self.session_lifetime_days}d")
-        print(f"   📊 Limites SEM chave própria: {self.default_requests_limit} req, {self.default_quota_limit} créditos")
-        print(f"   📊 Limites COM chave própria: {self.custom_key_requests_limit} req, {'ilimitado' if self.custom_key_quota_limit == 0 else self.custom_key_quota_limit} créditos")
-        print(f"   🛡️ Proteção anti-abuso: {self.max_sessions_per_ip_per_hour}/hora, {self.max_sessions_per_ip_per_day}/dia, {self.max_active_sessions_per_ip} ativas/IP")
-        
-        # ✅ PROTEÇÃO 3: Iniciar limpeza automática
+        # Proteção 3: Limpeza automática / Protection 3: Auto-cleanup
         self._start_cleanup_task()
     
     # ========================================
-    # PROTEÇÃO 1: Rate Limit de Criação
+    # Proteção 1: Rate Limit de Criação
+    # Protection 1: Creation Rate Limit
     # ========================================
     
     def can_create_session(self, client_ip: str) -> tuple[bool, str]:
         """
-        Verifica se IP pode criar nova sessão
+        Verifica se IP pode criar nova sessão.
+        Checks if IP can create a new session.
         
         Args:
-            client_ip: IP do cliente
+            client_ip: IP do cliente / Client IP
         
         Returns:
-            (pode_criar, mensagem_erro)
+            (can_create, error_message)
         """
         now = datetime.utcnow()
         
@@ -95,55 +80,50 @@ class AnonymousAuthManager:
                 if (now - ts).total_seconds() < 86400  # 24 horas
             ]
         
-        # Obter timestamps de criação deste IP
+        # Obter timestamps de criação deste IP / Get creation timestamps for this IP
         timestamps = self.session_creation_tracker.get(client_ip, [])
         
-        # Verificar sessões ativas simultâneas
+        # Verificar sessões ativas simultâneas / Check concurrent active sessions
         active_sessions = self.get_active_sessions_for_ip(client_ip)
         if active_sessions >= self.max_active_sessions_per_ip:
             return False, f"Limite de {self.max_active_sessions_per_ip} sessões ativas simultâneas atingido. Aguarde sessões expirarem ou use API Key."
         
-        # Verificar limite por hora
+        # Verificar limite por hora / Check hourly limit
         last_hour = [ts for ts in timestamps if (now - ts).total_seconds() < 3600]
         if len(last_hour) >= self.max_sessions_per_ip_per_hour:
             return False, f"Limite de {self.max_sessions_per_ip_per_hour} sessões/hora atingido. Tente novamente em alguns minutos ou use API Key."
         
-        # Verificar limite por dia
+        # Verificar limite por dia / Check daily limit
         if len(timestamps) >= self.max_sessions_per_ip_per_day:
             return False, f"Limite de {self.max_sessions_per_ip_per_day} sessões/dia atingido. Retorne amanhã ou use API Key."
         
         return True, ""
     
     def track_session_creation(self, client_ip: str):
-        """Registra criação de sessão com alertas de segurança"""
+        """
+        Registra criação de sessão.
+        Records session creation.
+        """
         if client_ip not in self.session_creation_tracker:
             self.session_creation_tracker[client_ip] = []
         
         self.session_creation_tracker[client_ip].append(datetime.utcnow())
-        count = len(self.session_creation_tracker[client_ip])
-        
-        print(f"📝 Sessões criadas por {client_ip}: {count} (última 24h)")
-        
-        # Alertas de segurança
-        if count >= 5:
-            print(f"⚠️ ALERTA: IP {client_ip} criou {count} sessões em 24h (possível abuso)")
-        
-        if count >= 8:
-            print(f"🚨 CRÍTICO: IP {client_ip} criou {count} sessões em 24h (provável ataque)")
     
     # ========================================
-    # PROTEÇÃO 2: Sessões Ativas por IP
+    # Proteção 2: Sessões Ativas por IP
+    # Protection 2: Active Sessions per IP
     # ========================================
     
     def get_active_sessions_for_ip(self, client_ip: str) -> int:
         """
-        Conta sessões ativas (não expiradas) deste IP
+        Conta sessões ativas (não expiradas) deste IP.
+        Counts active (non-expired) sessions for this IP.
         
         Args:
-            client_ip: IP do cliente
+            client_ip: IP do cliente / Client IP
         
         Returns:
-            Número de sessões ativas
+            Número de sessões ativas / Number of active sessions
         """
         count = 0
         now = datetime.utcnow()
@@ -158,26 +138,32 @@ class AnonymousAuthManager:
         return count
     
     # ========================================
-    # PROTEÇÃO 3: Limpeza Automática
+    # Proteção 3: Limpeza Automática
+    # Protection 3: Automatic Cleanup
     # ========================================
     
     def _start_cleanup_task(self):
-        """Inicia tarefa de limpeza de sessões expiradas"""
+        """
+        Inicia tarefa de limpeza de sessões expiradas.
+        Starts expired session cleanup task.
+        """
         def cleanup():
             while True:
-                time.sleep(3600)  # A cada 1 hora
+                time.sleep(3600)
                 self._cleanup_expired_sessions()
         
         thread = threading.Thread(target=cleanup, daemon=True)
         thread.start()
-        print("   🧹 Limpeza automática de sessões iniciada (a cada 1h)")
     
     def _cleanup_expired_sessions(self):
-        """Remove sessões expiradas e limpa tracker"""
+        """
+        Remove sessões expiradas e limpa tracker.
+        Removes expired sessions and cleans tracker.
+        """
         now = datetime.utcnow()
         expired_sessions = []
         
-        # Limpar sessões expiradas
+        # Limpar sessões expiradas / Clean expired sessions
         for session_id, session in list(self.anonymous_sessions.items()):
             age = now - session["created_at"]
             
@@ -185,7 +171,7 @@ class AnonymousAuthManager:
             if age > timedelta(days=self.session_lifetime_days):
                 expired_sessions.append(session_id)
         
-        # Remover sessões expiradas
+        # Remover sessões expiradas / Remove expired sessions
         for session_id in expired_sessions:
             del self.anonymous_sessions[session_id]
         
@@ -196,17 +182,14 @@ class AnonymousAuthManager:
                 if (now - ts).total_seconds() < 86400
             ]
             
-            # Remover IPs sem registros
+            # Remover IPs sem registros / Remove IPs without records
             if not self.session_creation_tracker[ip]:
                 del self.session_creation_tracker[ip]
         
-        if expired_sessions:
-            print(f"🧹 Limpeza automática: {len(expired_sessions)} sessões expiradas removidas")
-            print(f"   └─ Sessões ativas: {len(self.anonymous_sessions)}")
-            print(f"   └─ IPs rastreados: {len(self.session_creation_tracker)}")
+
     
     # ========================================
-    # GERAÇÃO DE TOKENS
+    # Geração de Tokens / Token Generation
     # ========================================
     
     def generate_anonymous_token(
@@ -216,23 +199,24 @@ class AnonymousAuthManager:
         session_id: Optional[str] = None
     ) -> dict:
         """
-        Gera tokens JWT para usuário anônimo (sem API key)
+        Gera tokens JWT para usuário anônimo.
+        Generates JWT tokens for anonymous user.
         
         Args:
-            client_ip: IP do cliente
-            fingerprint: Browser fingerprint (opcional, para evitar abuso)
-            session_id: Se fornecido, renova token da sessão existente
+            client_ip: IP do cliente / Client IP
+            fingerprint: Browser fingerprint (opcional / optional)
+            session_id: Se fornecido, renova sessão existente / If provided, renews existing session
         
         Returns:
-            dict com access_token, refresh_token e metadados
+            Dict com access_token, refresh_token e metadados / Dict with tokens and metadata
         """
         now = datetime.utcnow()
         
-        # Renovação de sessão existente?
+        # Renovação de sessão existente / Existing session renewal
         if session_id and session_id in self.anonymous_sessions:
             session = self.anonymous_sessions[session_id]
             
-            # Verificar se sessão não expirou completamente
+            # Verificar se sessão não expirou / Check if session hasn't expired
             session_age = now - session["created_at"]
             if session_age > timedelta(days=self.session_lifetime_days):
                 raise HTTPException(
@@ -240,9 +224,8 @@ class AnonymousAuthManager:
                     detail="Sessão expirada completamente. Crie nova sessão."
                 )
             
-            print(f"🔄 Renovando tokens para sessão: {session_id}")
         else:
-            # ✅ NOVA SESSÃO: Verificar proteções anti-abuso
+            # Nova sessão: Verificar proteções / New session: Check protections
             can_create, error_msg = self.can_create_session(client_ip)
             if not can_create:
                 raise HTTPException(
@@ -250,7 +233,7 @@ class AnonymousAuthManager:
                     detail=error_msg + " 💡 Dica: Use API Key permanente para acesso ilimitado."
                 )
             
-            # Criar nova sessão
+            # Criar nova sessão / Create new session
             session_id = f"anon_{uuid.uuid4().hex[:12]}"
             self.anonymous_sessions[session_id] = {
                 "created_at": now,
@@ -260,14 +243,12 @@ class AnonymousAuthManager:
                 "quota_used": 0
             }
             
-            # Registrar criação
+            # Registrar criação / Record creation
             self.track_session_creation(client_ip)
-            
-            print(f"🆕 Nova sessão anônima criada: {session_id} | IP: {client_ip}")
         
         session = self.anonymous_sessions[session_id]
         
-        # Gerar ACCESS TOKEN (curto - 1h)
+        # Gerar ACCESS TOKEN (curto) / Generate ACCESS TOKEN (short-lived)
         access_exp = now + timedelta(minutes=self.access_token_lifetime)
         access_token = jwt.encode({
             "sub": session_id,
@@ -278,7 +259,7 @@ class AnonymousAuthManager:
             "exp": access_exp.timestamp()
         }, self.secret, algorithm=self.algorithm)
         
-        # Gerar REFRESH TOKEN (longo - 7 dias)
+        # Gerar REFRESH TOKEN (longo) / Generate REFRESH TOKEN (long-lived)
         refresh_exp = now + timedelta(days=self.session_lifetime_days)
         refresh_token = jwt.encode({
             "sub": session_id,
@@ -322,13 +303,14 @@ class AnonymousAuthManager:
         refresh_token: str = Header(None, alias="X-Refresh-Token")
     ) -> dict:
         """
-        Renova access token usando refresh token
+        Renova access token usando refresh token.
+        Refreshes access token using refresh token.
         
         Args:
-            refresh_token: Refresh token válido no header X-Refresh-Token
+            refresh_token: Refresh token válido / Valid refresh token in X-Refresh-Token header
         
         Returns:
-            Novos access_token + refresh_token
+            Novos tokens / New access_token + refresh_token
         """
         if not refresh_token:
             raise HTTPException(
@@ -337,10 +319,10 @@ class AnonymousAuthManager:
             )
         
         try:
-            # Decodificar refresh token
+            # Decodificar refresh token / Decode refresh token
             payload = jwt.decode(refresh_token, self.secret, algorithms=[self.algorithm])
             
-            # Validar tipo
+            # Validar tipo / Validate type
             if payload.get("type") != "refresh":
                 raise HTTPException(
                     status_code=401,
@@ -349,24 +331,24 @@ class AnonymousAuthManager:
             
             session_id = payload["sub"]
             
-            # Sessão existe?
+            # Sessão existe? / Session exists?
             if session_id not in self.anonymous_sessions:
                 raise HTTPException(
                     status_code=401,
                     detail="Sessão não encontrada. Crie nova sessão em POST /api/auth/anonymous"
                 )
             
-            # Validar IP (segurança)
+            # Validar IP / Validate IP
             client_ip = self._get_real_ip(request)
             token_ip = payload.get("ip")
             
-            if token_ip != client_ip:
-                print(f"⚠️ IP mudou para sessão {session_id} | Token: {token_ip} | Atual: {client_ip}")
+
             
-            # Obter fingerprint do payload original
+            # Obter fingerprint do payload / Get fingerprint from payload
             fingerprint = payload.get("fingerprint")
             
-            # Gerar NOVOS tokens (access + refresh) - SEM verificar limites de criação
+            # Gerar novos tokens (sem verificar limites de criação)
+            # Generate new tokens (skip creation limit checks)
             return self.generate_anonymous_token(
                 client_ip=client_ip,
                 fingerprint=fingerprint,
@@ -390,15 +372,16 @@ class AnonymousAuthManager:
         authorization: Optional[str] = Header(None)
     ) -> dict:
         """
-        Verifica access token anônimo com limites dinâmicos baseados em chave Gemini
+        Verifica access token anônimo com limites dinâmicos.
+        Verifies anonymous access token with dynamic limits.
         
         Args:
             authorization: Header Authorization com Bearer token
         
         Returns:
-            Payload do token com dados da sessão
+            Payload do token com dados da sessão / Token payload with session data
         """
-        # Extrair token
+        # Extrair token / Extract token
         token = None
         if authorization:
             if authorization.startswith("Bearer "):
@@ -412,11 +395,11 @@ class AnonymousAuthManager:
                 detail="Token obrigatório. Obtenha em: POST /api/auth/anonymous"
             )
         
-        # Decodificar
+        # Decodificar / Decode
         try:
             payload = jwt.decode(token, self.secret, algorithms=[self.algorithm])
             
-            # Verificar se é access token
+            # Verificar se é access token / Check if it's an access token
             if payload.get("type") != "access":
                 raise HTTPException(
                     status_code=401,
@@ -425,7 +408,7 @@ class AnonymousAuthManager:
             
             session_id = payload["sub"]
             
-            # Sessão existe?
+            # Sessão existe? / Session exists?
             if session_id not in self.anonymous_sessions:
                 raise HTTPException(
                     status_code=401,
@@ -434,17 +417,17 @@ class AnonymousAuthManager:
             
             session = self.anonymous_sessions[session_id]
             
-            # Validar IP (anti-roubo de token)
+            # Validar IP (anti-roubo de token) / Validate IP (token theft prevention)
             client_ip = self._get_real_ip(request)
             token_ip = payload.get("ip")
             
-            if token_ip != client_ip:
-                print(f"⚠️ IP mismatch para sessão {session_id} | Token: {token_ip} | Atual: {client_ip}")
             
-            # Verificar se cliente está usando chave Gemini própria
+            # Verificar se cliente usa chave Gemini própria
+            # Check if client is using own Gemini key
             has_custom_gemini_key = request.headers.get("X-Gemini-Key") is not None
             
             # Aplicar limites baseado em chave própria ou não
+            # Apply limits based on own key or not
             if has_custom_gemini_key:
                 requests_limit = self.custom_key_requests_limit
                 quota_limit = self.custom_key_quota_limit
@@ -454,7 +437,7 @@ class AnonymousAuthManager:
                 quota_limit = self.default_quota_limit
                 limit_type = "server_key"
             
-            # Verificar limite de requisições
+            # Verificar limite de requisições / Check request limit
             if session["requests_count"] >= requests_limit:
                 extra_msg = ""
                 if limit_type == "server_key":
@@ -465,7 +448,7 @@ class AnonymousAuthManager:
                     detail=f"Limite de requisições atingido ({requests_limit}).{extra_msg}"
                 )
             
-            # Verificar quota (0 = ilimitado)
+            # Verificar quota (0 = ilimitado) / Check quota (0 = unlimited)
             if quota_limit > 0 and session["quota_used"] >= quota_limit:
                 extra_msg = ""
                 if limit_type == "server_key":
@@ -477,7 +460,7 @@ class AnonymousAuthManager:
                     detail=f"Quota esgotada ({quota_limit} créditos).{extra_msg}"
                 )
             
-            # Incrementar contador de requisições
+            # Incrementar contador / Increment counter
             session["requests_count"] += 1
             
             return {
@@ -504,33 +487,34 @@ class AnonymousAuthManager:
     
     def consume_quota(self, session_id: str, amount: int):
         """
-        Consome quota da sessão anônima
+        Consome quota da sessão anônima.
+        Consumes quota from anonymous session.
         
         Args:
-            session_id: ID da sessão
-            amount: Quantidade de créditos a consumir
+            session_id: ID da sessão / Session ID
+            amount: Quantidade de créditos / Amount of credits
         """
         if session_id in self.anonymous_sessions:
             self.anonymous_sessions[session_id]["quota_used"] += amount
-            print(f"💰 Quota consumida: {amount} | Sessão: {session_id} | Total: {self.anonymous_sessions[session_id]['quota_used']}")
     
     def get_session_stats(self, session_id: str, has_custom_key: bool = False) -> dict:
         """
-        Retorna estatísticas da sessão considerando tipo de limite
+        Retorna estatísticas da sessão.
+        Returns session statistics.
         
         Args:
-            session_id: ID da sessão
-            has_custom_key: Se está usando chave Gemini própria
+            session_id: ID da sessão / Session ID
+            has_custom_key: Se usa chave Gemini própria / If using own Gemini key
         
         Returns:
-            dict com estatísticas de uso
+            Dict com estatísticas de uso / Dict with usage statistics
         """
         if session_id not in self.anonymous_sessions:
             return {"error": "Sessão não encontrada"}
         
         session = self.anonymous_sessions[session_id]
         
-        # Aplicar limites corretos baseado no tipo
+        # Aplicar limites corretos / Apply correct limits
         if has_custom_key:
             requests_limit = self.custom_key_requests_limit
             quota_limit = self.custom_key_quota_limit
@@ -540,7 +524,7 @@ class AnonymousAuthManager:
             quota_limit = self.default_quota_limit
             limit_type = "server_key"
         
-        # Calcular remainings
+        # Calcular restantes / Calculate remaining
         requests_remaining = max(0, requests_limit - session["requests_count"])
         
         if quota_limit == 0:
@@ -565,7 +549,8 @@ class AnonymousAuthManager:
     
     def _get_real_ip(self, request: Request) -> str:
         """
-        Obtém IP real do cliente considerando proxies
+        Obtém IP real do cliente considerando proxies.
+        Gets client's real IP considering proxies.
         
         Args:
             request: FastAPI Request object
@@ -573,7 +558,7 @@ class AnonymousAuthManager:
         Returns:
             IP address string
         """
-        # Tentar headers de proxy primeiro
+        # Tentar headers de proxy primeiro / Try proxy headers first
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             return forwarded.split(",")[0].strip()
@@ -582,9 +567,9 @@ class AnonymousAuthManager:
         if real_ip:
             return real_ip
         
-        # Fallback para IP direto
+        # Fallback para IP direto / Fallback to direct IP
         return request.client.host if request.client else "unknown"
 
 
-# Instância global
+# Instância global / Global instance
 anon_auth = AnonymousAuthManager()

@@ -1,24 +1,30 @@
-# app/middleware/quota.py
+
 
 import os
 from datetime import datetime, timedelta
 from typing import Dict
 
 class QuotaManager:
-    """Sistema de quotas por usuário"""
+    """
+    Sistema de quotas por usuário.
+    Per-user quota system.
+    """
     
     def __init__(self):
-        # Quotas diárias por API Key
+        # Quotas diárias por API Key / Daily quotas per API Key
         self.quotas = {}
         self.free_tier_limit = int(os.getenv("FREE_TIER_DAILY_LIMIT", "10"))
         self.premium_tier_limit = int(os.getenv("PREMIUM_TIER_DAILY_LIMIT", "100"))
         
-        # Whitelist de chaves premium (definir no .env)
+        # Whitelist de chaves premium / Premium keys whitelist
         premium_keys = os.getenv("PREMIUM_API_KEYS", "")
         self.premium_keys = set(k.strip() for k in premium_keys.split(',') if k.strip())
     
     def check_quota(self, api_key: str) -> tuple[bool, str]:
-        """Verifica se usuário ainda tem quota"""
+        """
+        Verifica se usuário ainda tem quota.
+        Checks if user still has quota.
+        """
         today = datetime.now().date()
         
         if api_key not in self.quotas:
@@ -26,12 +32,12 @@ class QuotaManager:
         
         quota_data = self.quotas[api_key]
         
-        # Reset se mudou o dia
+        # Reset se mudou o dia / Reset if day changed
         if quota_data["date"] != today:
             quota_data["date"] = today
             quota_data["count"] = 0
         
-        # Verificar limite
+        # Verificar limite / Check limit
         is_premium = api_key in self.premium_keys
         limit = self.premium_tier_limit if is_premium else self.free_tier_limit
         
@@ -42,7 +48,10 @@ class QuotaManager:
         return True, "OK"
     
     def consume_quota(self, api_key: str):
-        """Consome 1 quota"""
+        """
+        Consome 1 quota.
+        Consumes 1 quota.
+        """
         self.quotas[api_key]["count"] += 1
 
 quota_manager = QuotaManager()

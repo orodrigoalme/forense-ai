@@ -10,7 +10,10 @@ import warnings
 
 @dataclass
 class FFTAnalysisResult:
-    """Estrutura de dados para resultado da análise FFT"""
+    """
+    Estrutura de dados para resultado da análise FFT.
+    Data structure for FFT analysis result.
+    """
     method: str
     status: str
     image_base64: str
@@ -22,12 +25,14 @@ class FFTAnalysisResult:
 class FFTAnalyzer:
     """
     Analisador de Espectro de Fourier (FFT) para detecção de imagens geradas por IA.
+    Fourier Spectrum (FFT) Analyzer for AI-generated image detection.
     
     Principais características de imagens IA detectáveis via FFT:
-    - Simetria excessiva no espectro (IA gera padrões simétricos perfeitos)
-    - Picos anômalos periódicos (grid artifacts, checkerboard patterns)
-    - Uniformidade espectral não natural (falta de complexidade orgânica)
-    - Padrões de grade (grid) em alta frequência (upscaling artifacts)
+    Main AI image features detectable via FFT:
+    - Simetria excessiva no espectro / Excessive spectrum symmetry
+    - Picos anômalos periódicos / Anomalous periodic peaks (grid artifacts)
+    - Uniformidade espectral não natural / Unnatural spectral uniformity
+    - Padrões de grade em alta frequência / High-frequency grid patterns (upscaling artifacts)
     """
     
     def __init__(self,
@@ -36,16 +41,19 @@ class FFTAnalyzer:
                  peak_detection_threshold: float = 0.3):
         """
         Args:
-            magnitude_threshold: Limiar para detectar picos significativos
-            symmetry_threshold: Limiar para considerar simetria excessiva
-            peak_detection_threshold: Limiar para detecção de picos locais
+            magnitude_threshold: Limiar para detectar picos significativos / Threshold for significant peaks
+            symmetry_threshold: Limiar para considerar simetria excessiva / Threshold for excessive symmetry
+            peak_detection_threshold: Limiar para detecção de picos locais / Threshold for local peak detection
         """
         self.magnitude_threshold = magnitude_threshold
         self.symmetry_threshold = symmetry_threshold
         self.peak_detection_threshold = peak_detection_threshold
         
     def _convert_to_base64(self, image: np.ndarray, format: str = 'PNG') -> str:
-        """Converte imagem numpy array para base64"""
+        """
+        Converte imagem numpy array para base64.
+        Converts numpy array image to base64.
+        """
         # Garantir que está em formato válido para PIL
         if len(image.shape) == 2:
             # Grayscale
@@ -70,7 +78,7 @@ class FFTAnalyzer:
     def _compute_fft_spectrum(self, gray_image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Calcula a FFT 2D e retorna espectro de magnitude e fase.
-        Aplica shift para centralizar baixas frequências.
+        Computes 2D FFT and returns magnitude and phase spectrum.
         """
         # Converter para float e normalizar
         f = np.fft.fft2(gray_image.astype(np.float32))
@@ -90,7 +98,7 @@ class FFTAnalyzer:
                                         magnitude: np.ndarray) -> np.ndarray:
         """
         Cria visualização colorida do espectro de Fourier.
-        Inclui: espectro bruto, espectro logarítmico, e análise de quadrantes.
+        Creates colored Fourier spectrum visualization.
         """
         h, w = magnitude_log.shape
         
@@ -146,7 +154,7 @@ class FFTAnalyzer:
     def _detect_peaks(self, magnitude: np.ndarray) -> np.ndarray:
         """
         Detecta picos locais anômalos no espectro.
-        Picos periódicos indicam padrões artificiais (grid artifacts).
+        Detects anomalous local peaks in the spectrum.
         """
         # Normalizar
         mag_norm = magnitude / (np.max(magnitude) + 1e-10)
@@ -181,8 +189,8 @@ class FFTAnalyzer:
                               magnitude_norm: np.ndarray, 
                               threshold_mask: np.ndarray) -> np.ndarray:
         """
-        Implementação simples de detecção de picos - OTIMIZADA.
-        Substitui loop duplo por operações de convolução.
+        Implementação otimizada de detecção de picos via convolução.
+        Optimized peak detection via convolution.
         """
         h, w = magnitude_norm.shape
     
@@ -208,7 +216,8 @@ class FFTAnalyzer:
 
     def _calculate_symmetry_score(self, magnitude: np.ndarray) -> float:
         """
-        Calcula score de simetria - OTIMIZADO.
+        Calcula score de simetria espectral.
+        Calculates spectral symmetry score.
         """
         h, w = magnitude.shape
     
@@ -250,9 +259,10 @@ class FFTAnalyzer:
     
     def _calculate_spectral_uniformity(self, magnitude: np.ndarray) -> float:
         """
-        Calcula uniformidade do espectro.
-        Espectros naturais têm distribuição complexa e não uniforme.
-        Espectros de IA tendem a ser mais uniformes/organizados.
+        Mede uniformidade do espectro de frequência.
+        Measures frequency spectrum uniformity.
+        Espectros de IA tendem a ser mais uniformes que fotos reais.
+        AI spectra tend to be more uniform than real photos.
         """
         # Normalizar
         mag = magnitude / (np.max(magnitude) + 1e-10)
@@ -280,10 +290,7 @@ class FFTAnalyzer:
                                   peaks_mask: np.ndarray) -> bool:
         """
         Detecta artefatos de grade (grid) típicos de upscaling IA.
-        
-        Características:
-        - Picos periódicos em padrão de grade
-        - Simetria quadrada/retangular nos picos
+        Detects grid artifacts typical of AI upscaling.
         """
         h, w = magnitude.shape
         center_y, center_x = h // 2, w // 2
@@ -312,7 +319,8 @@ class FFTAnalyzer:
         # Verificar se há grupos com simetria quadrada
         for group in distance_groups.values():
             if len(group) >= 4:
-                # Verificar se formam padrão aproximadamente quadrado/retangular
+                # Verificar se formam padrão quadrado/retangular
+        # Check if they form a square/rectangular pattern
                 angles = []
                 for y, x in group:
                     angle = np.arctan2(y - center_y, x - center_x)
@@ -322,15 +330,18 @@ class FFTAnalyzer:
                 angles_sorted = np.sort(angles)
                 
                 # Verificar espaçamento regular (simetria)
+                # Check for regular spacing (symmetry)
                 if len(angles_sorted) >= 4:
                     diffs = np.diff(np.concatenate([angles_sorted, [angles_sorted[0] + 2*np.pi]]))
                     angle_variance = np.var(diffs)
                     
-                    # Baixa variância nos ângulos = simetria perfeita (suspeito)
+                    # Baixa variância nos ângulos = simetria exata (suspeito)
+                # Low angle variance = exact symmetry (suspicious)
                     if angle_variance < 0.1:
                         return True
         
         # Verificar padrão de checkerboard (alternância perfeita)
+        # Check for checkerboard pattern (perfect alternation)
         # Analisar distribuição de energia em quadrantes
         q1 = magnitude[:center_y, :center_x].mean()
         q2 = magnitude[:center_y, center_x:].mean()
@@ -347,38 +358,37 @@ class FFTAnalyzer:
         return False
     
     def _count_significant_peaks(self, peaks_mask: np.ndarray) -> int:
-        """Conta número de picos significativos detectados"""
+        """
+        Conta número de picos significativos detectados.
+        Counts the number of significant detected peaks.
+        """
         return int(np.sum(peaks_mask))
 
     def _detect_simple_image(self, gray_image: np.ndarray) -> bool:
         """
         Detecta se a imagem é naturalmente simples (monocromática, sem detalhes).
-        Imagens simples têm espectro uniforme naturalmente, não é sinal de IA.
+        Detects if the image is naturally simple (monochromatic, low detail).
+        Imagens simples têm espectro uniforme naturalmente.
+        Simple images naturally have a uniform spectrum.
         """
-        # Calcular complexidade visual (Variância de gradientes)
+        # Calcular complexidade visual / Calculate visual complexity
         sobelx = cv2.Sobel(gray_image, cv2.CV_64F, 1, 0, ksize=3)
         sobely = cv2.Sobel(gray_image, cv2.CV_64F, 0, 1, ksize=3)
         gradient_magnitude = np.sqrt(sobelx**2 + sobely**2)
         
-        # Calcular média de gradiente (quanto mais baixo, mais simples)
         mean_gradient = np.mean(gradient_magnitude)
-        
-        # Calcular variância de cor (imagem monocromática tem baixa variância)
         color_variance = np.var(gray_image)
         
-        # DEBUG: Ver os valores reais
-        print(f"🔍 FFT Complexity Check: gradient={mean_gradient:.2f}, variance={color_variance:.2f}")
-        
         is_simple = (mean_gradient < 15.0) and (color_variance < 6000.0)
-        
-        print(f"🔍 Is Simple Image? {is_simple}")
         
         return is_simple
   
     def _compute_spatial_fft_map(self, gray: np.ndarray) -> np.ndarray:
         """
         Calcula FFT por blocos para criar mapa espacial.
-        Retorna mapa onde valores altos = padrões suspeitos (grid patterns)
+        Computes block-wise FFT to create spatial map.
+        Valores altos = padrões suspeitos (grid patterns).
+        High values = suspicious patterns (grid patterns).
         """
         h, w = gray.shape
         block_size = 64  # Blocos de 64x64
@@ -436,17 +446,13 @@ class FFTAnalyzer:
                                is_simple_image: bool = False) -> float:
         """
         Calcula score de risco composto (0-1).
-        
-        Fatores:
-        - Simetria excessiva (>0.9 suspeito)
-        - Uniformidade alta (>0.8 suspeito)
-        - Grid artifacts (booleano, peso alto)
-        - Número de picos anômalos
+        Calculates composite risk score (0-1).
         """
         scores = []
         
-        # Fator 1: Simetria (AJUSTADO)
-        # Se a imagem é simples, simetria alta é NORMAL
+        # Fator 1: Simetria / Factor 1: Symmetry
+        # Se a imagem é simples, simetria alta é normal
+        # If image is simple, high symmetry is normal
         if is_simple_image:
             scores.append(0.05) # Ignora simetria em imagens simples
         else:
@@ -459,7 +465,7 @@ class FFTAnalyzer:
             else:
                 scores.append(0.1)
         
-        # Fator 2: Uniformidade (AJUSTADO)
+        # Fator 2: Uniformidade / Factor 2: Uniformity
         if is_simple_image:
             scores.append(0.05) # Ignora uniformidade em imagens simples
         else:
@@ -472,13 +478,13 @@ class FFTAnalyzer:
             else:
                 scores.append(0.05)
         
-        # Fator 3: Grid artifacts (mantido - esse é confiável)
+        # Fator 3: Grid artifacts / Factor 3: Grid artifacts
         if grid_artifacts:
             scores.append(0.95)
         else:
             scores.append(0.0)
         
-        # Fator 4: Picos (mantido)
+        # Fator 4: Picos periódicos / Factor 4: Periodic peaks
         if peak_count > 50:
             scores.append(0.8)
         elif peak_count > 30:
@@ -488,7 +494,7 @@ class FFTAnalyzer:
         else:
             scores.append(0.1)
         
-        # Média ponderada
+        # Média ponderada / Weighted average
         weights = [0.25, 0.25, 0.35, 0.15]
         final_score = sum(s * w for s, w in zip(scores, weights))
         
@@ -500,7 +506,10 @@ class FFTAnalyzer:
                           grid_artifacts: bool,
                           peak_count: int,
                           is_simple_image: bool = False) -> List[str]:
-        """Gera lista de avisos - VERSÃO COM FILTRO DE CONTEXTO"""
+        """
+        Gera lista de avisos com filtro de contexto.
+        Generates context-filtered warning list.
+        """
         warnings = []
         
         # Se a imagem é simples, ignora avisos de simetria/uniformidade
@@ -517,7 +526,7 @@ class FFTAnalyzer:
             
             return warnings
         
-        # ==== LÓGICA NORMAL (Imagens complexas) ====
+        # Lógica normal (imagens complexas) / Normal logic (complex images)
         
         if symmetry > 0.98:
             warnings.append("Simetria espectral quase perfeita - altamente artificial")
@@ -542,7 +551,7 @@ class FFTAnalyzer:
         
         # Mensagem positiva se não houver problemas
         if len(warnings) == 0:
-            return ["✅ Nenhuma anomalia espectral detectada."]
+            return ["✅ Nenhuma anomalia espectral detectada. / No spectral anomalies detected."]
         
         return warnings
 
@@ -550,12 +559,13 @@ class FFTAnalyzer:
     def analyze(self, image_path: str) -> Dict:
         """
         Executa análise completa de Espectro de Fourier.
+        Runs complete Fourier Spectrum analysis.
         
         Args:
-            image_path: Caminho para a imagem
+            image_path: Caminho para a imagem / Path to the image
             
         Returns:
-            Dict no formato especificado do padrão de resposta
+            Dict com resultado da análise / Dict with analysis result
         """
         try:
             # Carregar imagem
@@ -573,8 +583,6 @@ class FFTAnalyzer:
             # Converter para grayscale
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             is_simple = self._detect_simple_image(gray)
-            if is_simple:
-                print("📷 Imagem simples detectada (parede/céu/monocromática)")
             
             # Redimensionar para potência de 2 (otimização FFT) se muito grande
             max_size = 1024
@@ -587,7 +595,7 @@ class FFTAnalyzer:
                 new_w = (new_w // 2) * 2
                 gray = cv2.resize(gray, (new_w, new_h), interpolation=cv2.INTER_AREA)
             
-            # Calcular FFT
+            # Calcular FFT / Compute FFT
             magnitude, magnitude_log, phase = self._compute_fft_spectrum(gray)
             
             # Métricas
@@ -605,11 +613,11 @@ class FFTAnalyzer:
             spectrum_vis = self._create_spectrum_visualization(magnitude_log, magnitude)
             spectrum_base64 = self._convert_to_base64(spectrum_vis)
 
-            # Gerar mapa espacial (NOVO)
+            # Gerar mapa espacial / Generate spatial map
             fft_spatial_map = self._compute_spatial_fft_map(gray)
             fft_map_base64 = self._convert_to_base64(fft_spatial_map)
             
-            # Calcular risco
+            # Calcular risco / Calculate risk
             risk_score = self._calculate_risk_score(
                 symmetry_score,
                 spectral_uniformity,
@@ -618,7 +626,7 @@ class FFTAnalyzer:
                 is_simple
             )
             
-            # Gerar avisos
+            # Gerar avisos / Generate warnings
             warnings_list = self._generate_warnings(
                 symmetry_score,
                 spectral_uniformity,
@@ -655,7 +663,10 @@ class FFTAnalyzer:
             }
     
     def _find_dominant_frequency(self, magnitude: np.ndarray) -> Tuple[int, int]:
-        """Encontra a frequência dominante (excluindo DC component)"""
+        """
+        Encontra a frequência dominante (excluindo DC component).
+        Finds the dominant frequency (excluding DC component).
+        """
         h, w = magnitude.shape
         center_y, center_x = h // 2, w // 2
         
@@ -677,8 +688,10 @@ class FFTAnalyzer:
     
     def _calculate_hf_energy_ratio(self, magnitude: np.ndarray) -> float:
         """
-        Calcula razão de energia em alta frequência vs baixa frequência.
+        Calcula razão de energia em alta vs baixa frequência.
+        Calculates high vs low frequency energy ratio.
         Imagens IA tendem a ter distribuição anômala de energia.
+        AI images tend to have anomalous energy distribution.
         """
         h, w = magnitude.shape
         center_y, center_x = h // 2, w // 2
@@ -709,15 +722,17 @@ class FFTAnalyzer:
 
 
 # Função de conveniência para uso direto
+# Convenience function for direct use
 def analyze_fft(image_path: str) -> Dict:
     """
     Função standalone para análise de Espectro de Fourier.
+    Standalone function for Fourier Spectrum analysis.
     
     Args:
-        image_path: Caminho para a imagem
+        image_path: Caminho para a imagem / Path to the image
         
     Returns:
-        Dict com resultado da análise no padrão especificado
+        Dict com resultado da análise / Dict with analysis result
     """
     analyzer = FFTAnalyzer()
     return analyzer.analyze(image_path)

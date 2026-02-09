@@ -6,7 +6,10 @@ from typing import Tuple
 
 
 class CostTracker:
-    """Rastreia custos da API Gemini usando arquivo JSON local"""
+    """
+    Rastreia custos da API Gemini usando arquivo JSON local.
+    Tracks Gemini API costs using a local JSON file.
+    """
     
     def __init__(self):
         self.data_file = Path("cost_tracking.json")
@@ -17,7 +20,10 @@ class CostTracker:
         self._load_data()
     
     def _load_data(self):
-        """Carrega dados do arquivo"""
+        """
+        Carrega dados do arquivo.
+        Loads data from file.
+        """
         if self.data_file.exists():
             with open(self.data_file, 'r') as f:
                 self.data = json.load(f)
@@ -25,12 +31,18 @@ class CostTracker:
             self.data = {"daily": {}, "monthly": {}}
     
     def _save_data(self):
-        """Salva dados no arquivo"""
+        """
+        Salva dados no arquivo.
+        Saves data to file.
+        """
         with open(self.data_file, 'w') as f:
             json.dump(self.data, f, indent=2)
     
     def can_make_request(self) -> Tuple[bool, str]:
-        """Verifica se pode fazer requisição baseado no budget"""
+        """
+        Verifica se pode fazer requisição baseado no budget.
+        Checks if a request can be made based on the budget.
+        """
         today = datetime.now().strftime("%Y-%m-%d")
         month = datetime.now().strftime("%Y-%m")
         
@@ -46,32 +58,41 @@ class CostTracker:
         return True, "OK"
     
     def track_request(self):
-        """Registra custo de uma requisição"""
+        """
+        Registra custo de uma requisição.
+        Records cost of a request.
+        """
         today = datetime.now().strftime("%Y-%m-%d")
         month = datetime.now().strftime("%Y-%m")
         
-        # Incrementar custo diário
+        # Incrementar custo diário / Increment daily cost
         if today not in self.data["daily"]:
             self.data["daily"][today] = 0.0
         self.data["daily"][today] += self.cost_per_request
         
-        # Incrementar custo mensal
+        # Incrementar custo mensal / Increment monthly cost
         if month not in self.data["monthly"]:
             self.data["monthly"][month] = 0.0
         self.data["monthly"][month] += self.cost_per_request
         
-        # Limpar dados antigos (manter apenas últimos 7 dias e 3 meses)
+        # Limpar dados antigos / Clean old data (keep last 7 days and 3 months)
         self._cleanup_old_data()
         
         self._save_data()
     
     def _get_cost(self, period_type: str, key: str) -> float:
-        """Obtém custo de um período"""
+        """
+        Obtém custo de um período.
+        Gets cost for a period.
+        """
         return self.data.get(period_type, {}).get(key, 0.0)
     
     def _cleanup_old_data(self):
-        """Remove dados antigos para não encher o arquivo"""
-        # Limpar dias antigos (manter últimos 7 dias)
+        """
+        Remove dados antigos para não encher o arquivo.
+        Removes old data to keep the file small.
+        """
+        # Limpar dias antigos / Clean old days (keep last 7)
         today = datetime.now()
         days_to_keep = 7
         
@@ -84,7 +105,7 @@ class CostTracker:
             except:
                 pass
         
-        # Limpar meses antigos (manter últimos 3 meses)
+        # Limpar meses antigos / Clean old months (keep last 3)
         months_to_keep = 3
         monthly_keys = list(self.data["monthly"].keys())
         for month_str in monthly_keys:
@@ -97,7 +118,10 @@ class CostTracker:
                 pass
     
     def get_current_usage(self) -> dict:
-        """Retorna uso atual (para dashboard/logs)"""
+        """
+        Retorna uso atual.
+        Returns current usage.
+        """
         today = datetime.now().strftime("%Y-%m-%d")
         month = datetime.now().strftime("%Y-%m")
         

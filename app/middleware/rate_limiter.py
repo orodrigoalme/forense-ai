@@ -7,35 +7,36 @@ import os
 def get_rate_limit_key(request: Request) -> str:
     """
     Define o rate limit baseado em:
-    1. Se tem chave Gemini customizada = limite alto
-    2. Se usa chave do servidor = limite baixo (configurável)
+    Defines rate limit based on:
+    1. Se tem chave Gemini customizada = limite alto / Custom Gemini key = high limit
+    2. Se usa chave do servidor = limite baixo / Server key = low limit
     """
     
-    # Verificar se tem chave Gemini customizada no header
+    # Verificar se tem chave Gemini customizada / Check for custom Gemini key
     custom_gemini_key = request.headers.get("X-Gemini-Key")
     
     if custom_gemini_key:
-        # Cliente com chave própria = limite generoso
+        # Cliente com chave própria = limite generoso / Own key = generous limit
         return f"custom:{get_remote_address(request)}"
     else:
-        # Usando chave do servidor = limite rigoroso
+        # Usando chave do servidor = limite rigoroso / Server key = strict limit
         return f"server:{get_remote_address(request)}"
 
 
-# Configurar limiter
+# Configurar limiter / Configure limiter
 limiter = Limiter(key_func=get_rate_limit_key)
 
 
 def get_rate_limit_for_endpoint(endpoint: str) -> str:
     """
-    Retorna string de rate limit baseada em variáveis de ambiente
+    Retorna string de rate limit baseada em variáveis de ambiente.
+    Returns rate limit string based on environment variables.
     
-    Formato: "N/period" onde period pode ser: second, minute, hour, day
-    Exemplo: "10/minute" ou "100/hour"
+    Formato / Format: "N/period" (second, minute, hour, day)
     """
     
     if endpoint == "analyze_full":
-        # Rate limit para análise completa (usa Gemini)
+        # Rate limit para análise completa / Full analysis rate limit
         server_key_limit = os.getenv("RATE_LIMIT_ANALYZE_SERVER_KEY", "3/minute")
         custom_key_limit = os.getenv("RATE_LIMIT_ANALYZE_CUSTOM_KEY", "20/minute")
         
@@ -45,7 +46,7 @@ def get_rate_limit_for_endpoint(endpoint: str) -> str:
         }
     
     elif endpoint == "analyze_individual":
-        # Rate limit para análises individuais (FFT, NOISE, ELA)
+        # Rate limit para análises individuais / Individual analysis rate limit
         server_key_limit = os.getenv("RATE_LIMIT_INDIVIDUAL_SERVER_KEY", "10/minute")
         custom_key_limit = os.getenv("RATE_LIMIT_INDIVIDUAL_CUSTOM_KEY", "30/minute")
         
@@ -61,10 +62,13 @@ def get_rate_limit_for_endpoint(endpoint: str) -> str:
 
 
 def get_dynamic_rate_limit(request: Request, endpoint: str) -> str:
-    """Retorna o rate limit apropriado para a requisição"""
+    """
+    Retorna o rate limit apropriado para a requisição.
+    Returns the appropriate rate limit for the request.
+    """
     limits = get_rate_limit_for_endpoint(endpoint)
     
-    # Verificar se tem chave Gemini customizada
+    # Verificar se tem chave Gemini customizada / Check for custom Gemini key
     custom_gemini_key = request.headers.get("X-Gemini-Key")
     
     if custom_gemini_key:

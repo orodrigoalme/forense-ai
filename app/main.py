@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from typing import Optional
 
 # Importar validador e analisadores
+# Import validator and analyzers
 from app.utils import validate_file_content, resize_if_too_big
 from app.analyzers.noise import NoiseMapAnalyzer
 from app.analyzers.fft import FFTAnalyzer
@@ -26,6 +27,7 @@ from app.middleware.anonymous_auth import anon_auth
 from fastapi.middleware.cors import CORSMiddleware
 
 # Inicializar rastreador de custos
+# Initialize cost tracker
 cost_tracker = CostTracker()
 
 app = FastAPI(
@@ -34,13 +36,14 @@ app = FastAPI(
     version="1.5.0"
 )
 
-# ✅ ADICIONAR CORS ANTES DE QUALQUER ROTA
+# Adicionar CORS antes de qualquer rota
+# Add CORS before any route
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permitir qualquer origem (ou especificar domínios)
+    allow_origins=["*"],  # Permitir qualquer origem / Allow any origin
     allow_credentials=True,
-    allow_methods=["*"],  # Permitir POST, GET, OPTIONS, etc
-    allow_headers=["*"],  # Permitir qualquer header
+    allow_methods=["*"],  # Permitir todos os métodos / Allow all methods
+    allow_headers=["*"],  # Permitir qualquer header / Allow any header
 )
 
 app.state.limiter = limiter
@@ -51,30 +54,32 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def save_bytes_to_disk(content: bytes, original_filename: str) -> str:
-    # 1. Gerar nome único
+    """
+    Salva bytes da imagem no disco.
+    Saves image bytes to disk.
+    """
+    # Gerar nome único / Generate unique name
     file_extension = original_filename.split(".")[-1] if "." in original_filename else "jpg"
     unique_name = f"{uuid.uuid4()}"
     filename = f"{unique_name}.{file_extension}"
     file_path = os.path.join(UPLOAD_DIR, filename)
     
-    print(f"💾 Salvando arquivo temporário: {filename} ({len(content)} bytes)") # DEBUG
-    
-    # 2. Gravar os bytes no disco (Isso estava faltando no seu snippet visualizado)
+    # Gravar os bytes no disco / Write bytes to disk
     with open(file_path, "wb") as buffer:
         buffer.write(content)
         
-    # 3. Redimensionar para evitar travar o servidor (Segurança)
-    # Certifique-se de ter importado a função no topo do arquivo:
-    # from app.utils import resize_if_too_big 
+    # Redimensionar para evitar travar o servidor
+    # Resize to prevent server overload
     try:
         resize_if_too_big(file_path)
     except Exception as e:
-        print(f"⚠️ Aviso: Falha ao redimensionar imagem (prosseguindo mesmo assim): {e}")
+        pass  # Prosseguir mesmo com falha / Proceed even on failure
 
     return file_path
 
 
 # Função para evitar cache do navegador
+# Function to prevent browser caching
 def no_cache_response(data: dict):
     response = JSONResponse(data)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -84,7 +89,7 @@ def no_cache_response(data: dict):
 
 
 # ========================================
-# AUTENTICAÇÃO FLEXÍVEL
+# AUTENTICAÇÃO FLEXÍVEL / FLEXIBLE AUTHENTICATION
 # ========================================
 
 def verify_flexible_auth(
@@ -93,40 +98,42 @@ def verify_flexible_auth(
     api_key: Optional[str] = Header(None, alias="X-API-Key")
 ) -> dict:
     """
-    Verifica autenticação - aceita token anônimo OU API key direta
+    Verifica autenticação - aceita token anônimo OU API key direta.
+    Verifies authentication - accepts anonymous token OR direct API key.
     
-    Prioridade:
-    1. API Key → validação direta (sem limites de sessão anônima)
-    2. Bearer Token → validação de token anônimo (com limites)
-    3. Nenhum → erro 401
+    Prioridade / Priority:
+    1. API Key → validação direta / direct validation (no anonymous session limits)
+    2. Bearer Token → validação de token anônimo / anonymous token validation (with limits)
+    3. Nenhum / None → erro 401
     
     Returns:
-        dict com tipo de autenticação e dados relevantes
+        dict com tipo de autenticação e dados relevantes / dict with auth type and relevant data
     """
     
     # Tentativa 1: API Key direta (clientes registrados ou demo)
+    # Attempt 1: Direct API Key (registered clients or demo)
     if api_key:
         try:
             api_key_auth.verify_api_key(api_key)
-            print(f"🔑 Autenticado via API Key: {api_key[:8]}...")
             return {
                 "auth_type": "api_key",
                 "api_key": api_key,
-                "has_limits": False  # API keys não têm limites de sessão anônima
+                "has_limits": False  # API keys não têm limites / API keys have no limits
             }
         except HTTPException as e:
             # API key inválida, mas pode ter token
+            # Invalid API key, but may have token
             if authorization:
-                pass  # Tentar token
+                pass  # Tentar token / Try token
             else:
-                raise e  # Sem token alternativo, propagar erro
+                raise e  # Sem token alternativo / No fallback token
     
     # Tentativa 2: Token anônimo (público)
+    # Attempt 2: Anonymous token (public)
     if authorization:
         try:
             token_payload = anon_auth.verify_anonymous_token(request, authorization)
             session_id = token_payload["session_id"]
-            print(f"🎫 Autenticado via token anônimo: {session_id}")
             return {
                 "auth_type": "anonymous",
                 "session_id": session_id,
@@ -135,64 +142,68 @@ def verify_flexible_auth(
             }
         except HTTPException as e:
             # Token inválido e sem API key válida
+            # Invalid token and no valid API key
             if not api_key:
                 raise e
-            # Se tinha API key mas também falhou, propagar erro da API key
+            # Se tinha API key mas também falhou, propagar erro
+            # If had API key but also failed, propagate error
             raise HTTPException(
                 status_code=401,
-                detail="API Key e Token inválidos"
+                detail="API Key e Token inválidos / Invalid API Key and Token"
             )
     
     # Nenhuma autenticação fornecida
+    # No authentication provided
     raise HTTPException(
         status_code=401,
         detail={
-            "error": "Autenticação obrigatória",
+            "error": "Autenticação obrigatória / Authentication required",
             "options": [
-                "Opção 1: Use API Key demo - Header: X-API-Key: aidet_demo_hackathon_2026",
-                "Opção 2: Gere token anônimo - POST /api/auth/anonymous"
+                "Option 1: Use demo API Key - Header: X-API-Key: aidet_demo_hackathon_2026",
+                "Option 2: Generate anonymous token - POST /api/auth/anonymous"
             ]
         }
     )
 
 
 
-# --- Endpoints ---
+# --- Endpoints / API Routes ---
 
 # ========================================
-# AUTENTICAÇÃO ANÔNIMA (sem cadastro)
+# AUTENTICAÇÃO ANÔNIMA / ANONYMOUS AUTHENTICATION
 # ========================================
 
 @app.post("/api/auth/anonymous", tags=["Authentication"])
 def generate_anonymous_token(request: Request):
     """
-    🎯 Gera token de acesso anônimo (SEM necessidade de API key)
+    🎯 Gera token de acesso anônimo (SEM necessidade de API key).
+    🎯 Generates anonymous access token (NO API key needed).
     
-    **Como funciona:**
-    1. Faça esta chamada sem enviar nada
-    2. Receba tokens JWT (access + refresh)
-    3. Use o access_token nas próximas requisições
+    **Como funciona / How it works:**
+    1. Faça esta chamada sem enviar nada / Make this call without sending anything
+    2. Receba tokens JWT (access + refresh) / Receive JWT tokens (access + refresh)
+    3. Use o access_token nas próximas requisições / Use access_token in subsequent requests
     
-    **Limites da sessão anônima:**
-    - ✅ 50 requisições por sessão
-    - ✅ 5.000 créditos de quota
-    - ✅ Access token válido por 1h (renováveis)
-    - ✅ Sessão válida por 7 dias
+    **Limites da sessão anônima / Anonymous session limits:**
+    - ✅ 50 requisições por sessão / requests per session
+    - ✅ 5.000 créditos de quota / quota credits
+    - ✅ Access token válido por 1h (renováveis) / Access token valid for 1h (renewable)
+    - ✅ Sessão válida por 7 dias / Session valid for 7 days
     
-    **Para acesso ilimitado:** Use API key demo ou solicite chave permanente.
+    **Para acesso ilimitado / For unlimited access:** Use API key demo ou solicite chave permanente / Use demo API key or request a permanent one.
     
-    **Exemplo de uso:**
+    **Exemplo de uso / Usage example:**
     ```bash
-    # 1. Obter tokens
+    # 1. Obter tokens / 1. Get tokens
     curl -X POST "https://seu-dominio.com/api/auth/anonymous"
-    # Resposta: {"access_token": "...", "refresh_token": "..."}
+    # Resposta: {"access_token": "...", "refresh_token": "..."} / Response: ...
     
-    # 2. Usar access token
+    # 2. Usar access token / 2. Use access token
     curl -X POST "https://seu-dominio.com/api/analyze-image" \\
       -H "Authorization: Bearer <access_token>" \\
       -F "file=@imagem.jpg"
     
-    # 3. Renovar quando expirar (após 1h)
+    # 3. Renovar quando expirar (após 1h) / 3. Renew when expired (after 1h)
     curl -X POST "https://seu-dominio.com/api/auth/refresh" \\
       -H "X-Refresh-Token: <refresh_token>"
     ```
@@ -211,19 +222,20 @@ def generate_anonymous_token(request: Request):
 @app.post("/api/auth/refresh", tags=["Authentication"])
 def refresh_anonymous_token(request: Request):
     """
-    🔄 Renova access token usando refresh token
+    🔄 Renova access token usando refresh token.
+    🔄 Refreshes access token using refresh token.
     
-    **Quando usar:**
-    - Access token expirou (após 1h)
-    - Preventivamente antes de expirar
+    **Quando usar / When to use:**
+    - Access token expirou (após 1h) / Access token expired
+    - Preventivamente antes de expirar / Preventively before expiring
     
-    **Exemplo:**
+    **Exemplo / Example:**
     ```bash
     curl -X POST "https://seu-dominio.com/api/auth/refresh" \\
       -H "X-Refresh-Token: <seu_refresh_token>"
     ```
     
-    **Retorna:** Novos access_token + refresh_token
+    **Retorna / Returns:** Novos access_token + refresh_token / New access_token + refresh_token
     """
     return anon_auth.refresh_access_token(request)
 
@@ -233,11 +245,13 @@ def get_session_stats(
     token_payload: dict = Depends(anon_auth.verify_anonymous_token)
 ):
     """
-    📊 Consulta estatísticas da sessão anônima atual
+    📊 Consulta estatísticas da sessão anônima atual.
+    📊 View current anonymous session statistics.
     
     Retorna informações sobre uso de quota, limites e idade da sessão.
+    Returns info about quota usage, limits, and session age.
     
-    **Requer:** Header `Authorization: Bearer <access_token>`
+    **Requer / Requires:** Header `Authorization: Bearer <access_token>`
     """
     session_id = token_payload["session_id"]
     stats = anon_auth.get_session_stats(session_id)
@@ -253,32 +267,33 @@ def delete_session(
     token_payload: dict = Depends(anon_auth.verify_anonymous_token)
 ):
     """
-    🗑️ Encerra a sessão anônima atual
+    🗑️ Encerra a sessão anônima atual.
+    🗑️ Ends the current anonymous session.
     
     Use antes de criar nova sessão para trocar de modo (com/sem chave Gemini).
+    Use before creating a new session to switch modes (with/without Gemini key).
     Isso libera espaço na quota de sessões ativas por IP.
+    This frees up space in the active session quota per IP.
     
-    **Exemplo:**
+    **Exemplo / Example:**
     ```bash
-    # 1. Encerrar sessão atual
+    # 1. Encerrar sessão atual / 1. End current session
     curl -X DELETE "/api/auth/session" \\
       -H "Authorization: Bearer <access_token>"
     
-    # 2. Criar nova sessão (agora no modo desejado)
+    # 2. Criar nova sessão / 2. Create new session
     curl -X POST "/api/auth/anonymous"
     ```
     """
     session_id = token_payload["session_id"]
     
     if session_id in anon_auth.anonymous_sessions:
-        # Remover sessão
+        # Remover sessão / Remove session
         session = anon_auth.anonymous_sessions[session_id]
         del anon_auth.anonymous_sessions[session_id]
         
-        print(f"🗑️ Sessão encerrada: {session_id} | Req usadas: {session['requests_count']}")
-        
         return {
-            "message": "Sessão encerrada com sucesso",
+            "message": "Sessão encerrada com sucesso / Session ended successfully",
             "session_id": session_id,
             "stats": {
                 "requests_used": session["requests_count"],
@@ -286,10 +301,10 @@ def delete_session(
             }
         }
     else:
-        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+        raise HTTPException(status_code=404, detail="Sessão não encontrada / Session not found")
 
 # ========================================
-# ANÁLISE
+# ANÁLISE / ANALYSIS
 # ========================================
 
 @app.post("/api/analyze-image", tags=["Analysis"])
@@ -301,67 +316,67 @@ async def analyze_image_full(
     captcha_token: Optional[str] = Header(None, alias="X-Captcha-Token")
 ):
     """
-    🔍 Análise completa de imagem: FFT + NOISE + ELA + Gemini AI
+    🔍 Análise completa de imagem: FFT + NOISE + ELA + Gemini AI.
+    🔍 Full image analysis: FFT + NOISE + ELA + Gemini AI.
     
-    ## Autenticação (escolha uma):
+    ## Autenticação / Authentication (choose one):
     
-    **Opção 1 - API Key (recomendado para integração):**
+    **Opção 1 - API Key (recomendado / recommended):**
     ```bash
     curl -X POST "/api/analyze-image" \\
       -H "X-API-Key: aidet_demo_hackathon_2026" \\
       -F "file=@imagem.jpg"
     ```
     
-    **Opção 2 - Token Anônimo (público, limitado):**
+    **Opção 2 - Token Anônimo / Optional 2 - Anonymous Token (public, limited):**
     ```bash
-    # Obter token primeiro
+    # Obter token primeiro / Get token first
     TOKEN=$(curl -X POST "/api/auth/anonymous" | jq -r .access_token)
     
-    # Usar token
+    # Usar token / Use token
     curl -X POST "/api/analyze-image" \\
       -H "Authorization: Bearer $TOKEN" \\
       -F "file=@imagem.jpg"
     ```
     
-    ## Headers opcionais:
-    - **X-Gemini-Key:** Sua chave Gemini (aumenta limites e usa seus créditos)
-    - **X-Captcha-Token:** Token reCAPTCHA (se CAPTCHA estiver habilitado)
+    ## Headers opcionais / Optional Headers:
+    - **X-Gemini-Key:** Sua chave Gemini / Your Gemini key (increases limits and uses your credits)
+    - **X-Captcha-Token:** Token reCAPTCHA / reCAPTCHA token (if enabled)
     
-    ## Limites por tipo de autenticação:
+    ## Limites por tipo de autenticação / Limits by auth type:
     
     ### API Key demo:
     - Rate limit: 20 req/min, 200 req/hora
-    - Quota: Ilimitada
+    - Quota: Ilimitada / Unlimited
     
-    ### Token anônimo SEM chave Gemini própria:
-    - Requisições: 50 por sessão
-    - Quota: 5.000 créditos por sessão
+    ### Token anônimo SEM chave Gemini própria / Anonymous token WITHOUT own Gemini key:
+    - Requisições: 50 por sessão / Requests per session
+    - Quota: 5.000 créditos por sessão / credits per session
     - Rate limit: 3 req/min
     
-    ### Token anônimo COM chave Gemini própria:
-    - Requisições: 200 por sessão (4x mais!)
-    - Quota: Ilimitada
-    - Rate limit: 20 req/min (6x mais!)
+    ### Token anônimo COM chave Gemini própria / Anonymous token WITH own Gemini key:
+    - Requisições: 200 por sessão / Requests per session (4x more!)
+    - Quota: Ilimitada / Unlimited
+    - Rate limit: 20 req/min (6x more!)
     
-    💡 **Dica:** Use sua própria chave Gemini (X-Gemini-Key) para limites muito maiores!
+    💡 **Dica / Tip:** Use sua própria chave Gemini (X-Gemini-Key) para limites muito maiores! / Use your own Gemini key for much higher limits.
     
-    ## Budget Caps (chave Gemini do servidor):
-    - $5/dia | $50/mês (protege custos do servidor)
+    ## Budget Caps (chave Gemini do servidor / Server Gemini key):
+    - $5/dia | $50/mês (protege custos do servidor / protects server costs)
     """
     
     auth_type = auth["auth_type"]
     has_custom_gemini_key = x_gemini_key is not None
     
-    # 1. Verificar quota baseado no tipo de autenticação
+    # Verificar quota baseado no tipo de autenticação
+    # Check quota based on authentication type
     if auth_type == "api_key":
         api_key = auth["api_key"]
         
-        # Verificar quota da API key
+        # Verificar quota da API key / Check API key quota
         can_proceed, message = quota_manager.check_quota(api_key)
         if not can_proceed:
             raise HTTPException(status_code=429, detail=message)
-        
-        print(f"📊 Análise via API Key: {api_key[:8]}... | {file.filename}")
         
     elif auth_type == "anonymous":
         session_id = auth["session_id"]
@@ -370,87 +385,66 @@ async def analyze_image_full(
         current_limits = auth.get("current_limits", {})
         
         # Limites já foram verificados em verify_anonymous_token
-        # (incrementou requests_count automaticamente)
-        
-        req_limit = current_limits.get("requests_limit", "?")
-        quota_limit = current_limits.get("quota_limit", "?")
-        
-        print(f"📊 Análise anônima: {session_id}")
-        print(f"   └─ Tipo: {limit_type} | Req: {session['requests_count']}/{req_limit} | Quota: {session['quota_used']}/{quota_limit}")
-        
-        if has_custom_gemini_key:
-            print(f"   └─ 💡 Cliente usando chave Gemini própria (limites estendidos)")
+        # Limits already checked in verify_anonymous_token
     
-    # 2. Se usar chave do servidor, verificar budget
+    # Se usar chave do servidor, verificar budget
+    # If using server key, check budget
     if not has_custom_gemini_key:
         can_proceed, message = cost_tracker.can_make_request()
         if not can_proceed:
             raise HTTPException(
                 status_code=429,
-                detail=f"{message}. 💡 Use sua própria chave Gemini (header X-Gemini-Key) para continuar sem limite de budget."
+                detail=f"{message}. Use your own Gemini key (X-Gemini-Key header) to continue without budget limits."
             )
     
-    # 3. Log de rate limit
-    rate_limit = get_dynamic_rate_limit(request, "analyze_full")
-    if has_custom_gemini_key:
-        print(f"   └─ Rate limit: {rate_limit} (chave própria)")
-    else:
-        print(f"   └─ Rate limit: {rate_limit} (chave do servidor)")
-    
-    # 4. Validar e salvar arquivo
+    # Validar e salvar arquivo / Validate and save file
     content = await file.read()
     validate_file_content(content, file.filename)
     path = save_bytes_to_disk(content, file.filename)
     
     try:
-        # 5. Executar análise
+        # Executar análise / Execute analysis
         analysis_service = AnalysisService(custom_gemini_key=x_gemini_key)
         result = await analysis_service.analyze_full(path)
         
-        # 6. Consumir quota baseado no tipo de autenticação
+        # Consumir quota baseado no tipo de autenticação
+        # Consume quota based on authentication type
         if auth_type == "api_key":
             quota_manager.consume_quota(api_key)
-            print(f"✅ Quota API key consumida")
             
         elif auth_type == "anonymous":
             # Consumir créditos da quota
-            # Se estiver usando chave própria, consumir menos (custo simbólico)
+            # Consume quota credits
             if has_custom_gemini_key:
-                cost = result.get("estimated_cost", 10)  # Custo menor (cliente paga Gemini)
+                cost = result.get("estimated_cost", 10)  # Custo menor / Lower cost
             else:
-                cost = result.get("estimated_cost", 100)  # Custo normal (servidor paga)
+                cost = result.get("estimated_cost", 100)  # Custo normal / Normal cost
             
             anon_auth.consume_quota(session_id, cost)
             
-            # ✅ NOVO: Adicionar info de uso com tipo de limite correto
+            # Adicionar info de uso com tipo de limite correto
+            # Add usage info with correct limit type
             result["session_usage"] = anon_auth.get_session_stats(
                 session_id, 
                 has_custom_key=has_custom_gemini_key
             )
-            
-            print(f"✅ Quota consumida: {cost} créditos | Restante: {result['session_usage']['quota_remaining']}")
         
-        # 7. Rastrear custo (apenas se usou chave do servidor E Gemini foi usado)
+        # Rastrear custo (apenas se usou chave do servidor E Gemini foi usado)
+        # Track cost (only if using server key AND Gemini was used)
         if not has_custom_gemini_key:
             gemini_used = result.get("gemini_analysis", {}).get("verdict") not in ["DISABLED", "ERROR"]
             if gemini_used:
                 cost_tracker.track_request()
-                print(f"💰 Custo do servidor registrado. Uso atual: {cost_tracker.get_current_usage()}")
-        else:
-            print(f"💡 Cliente usando chave própria - sem custo para o servidor")
         
         return no_cache_response(result)
         
     except Exception as e:
-        print(f"❌ Erro na análise: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # NÃO consumir quota se deu erro
-        raise HTTPException(status_code=500, detail=f"Erro na análise: {str(e)}")
+        # Não consumir quota se deu erro
+        # Don't consume quota on error
+        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
     
     finally:
-        # 8. Limpar arquivo temporário
+        # Limpar arquivo temporário / Clean up temporary file
         if os.path.exists(path):
             os.remove(path)
 

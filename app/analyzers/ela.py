@@ -10,7 +10,10 @@ from collections import defaultdict
 
 @dataclass
 class ELAResult:
-    """Estrutura de dados para resultado da análise ELA"""
+    """
+    Estrutura de dados para resultado da análise ELA.
+    Data structure for ELA analysis result.
+    """
     method: str
     status: str
     image_base64: str
@@ -22,16 +25,25 @@ class ELAResult:
 class ELAAnalyzer:
     """
     Analisador de Error Level Analysis (ELA) para detecção de manipulação e imagens IA.
+    Error Level Analysis (ELA) analyzer for manipulation and AI image detection.
     
     Principais características detectáveis via ELA:
-    - Diferenças de nível de erro entre regiões (indicativo de recompressão seletiva)
+    Main detectable features via ELA:
+    - Diferenças de nível de erro entre regiões (recompressão seletiva)
+      Error level differences between regions (selective recompression)
     - Regiões com erro anormalmente baixo (inserções de IA perfeitas)
+      Abnormally low error regions (perfect AI insertions)
     - Bordas com erro inconsistente (splicing, copy-move)
+      Edges with inconsistent error (splicing, copy-move)
     - Padrões de erro uniforme demais (geração IA total)
+      Overly uniform error patterns (full AI generation)
     
     ELA funciona re-salvando a imagem com qualidade conhecida e comparando
-    com o original - regiões que mudam pouco foram provavelmente salvas 
+    com o original - regiões que mudam pouco foram provavelmente salvas
     na mesma qualidade anterior (possivelmente manipuladas).
+    ELA works by re-saving the image at a known quality and comparing it
+    with the original - regions that change little were probably saved
+    at the same quality before (possibly manipulated).
     """
     
     def __init__(self,
@@ -41,10 +53,10 @@ class ELAAnalyzer:
                  min_region_size: int = 100):
         """
         Args:
-            quality_levels: Níveis de qualidade JPEG para recompressão
-            error_threshold_low: Limiar inferior de erro (pixels suspeitos)
-            error_threshold_high: Limiar superior de erro (pixels normais)
-            min_region_size: Tamanho mínimo para considerar uma região
+            quality_levels: Níveis de qualidade JPEG para recompressão / JPEG quality levels for recompression
+            error_threshold_low: Limiar inferior de erro / Lower error threshold (suspicious pixels)
+            error_threshold_high: Limiar superior de erro / Upper error threshold (normal pixels)
+            min_region_size: Tamanho mínimo para considerar uma região / Minimum region size to consider
         """
         self.quality_levels = quality_levels
         self.error_threshold_low = error_threshold_low
@@ -52,7 +64,10 @@ class ELAAnalyzer:
         self.min_region_size = min_region_size
         
     def _convert_to_base64(self, image: np.ndarray, format: str = 'PNG') -> str:
-        """Converte imagem numpy array para base64"""
+        """
+        Converte imagem numpy array para base64.
+        Converts numpy array image to base64.
+        """
         if len(image.shape) == 2:
             image_rgb = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         elif len(image.shape) == 3 and image.shape[2] == 3:
@@ -76,60 +91,63 @@ class ELAAnalyzer:
                      scale_factor: int = 15) -> Tuple[np.ndarray, np.ndarray]:
         """
         Calcula Error Level Analysis para um nível de qualidade específico.
+        Computes Error Level Analysis for a specific quality level.
         
         Args:
-            original: Imagem original (BGR)
-            quality: Qualidade JPEG para recompressão
-            scale_factor: Fator de escala para visualização do erro
+            original: Imagem original (BGR) / Original image (BGR)
+            quality: Qualidade JPEG para recompressão / JPEG quality for recompression
+            scale_factor: Fator de escala para visualização / Scale factor for visualization
             
         Returns:
-            ela_image: Imagem ELA visualizável
-            error_map: Mapa numérico de erro absoluto
+            ela_image: Imagem ELA visualizável / Viewable ELA image
+            error_map: Mapa numérico de erro / Numerical error map
+            error_per_channel: Erro médio por canal / Mean error per channel
+            raw_diff: Diferença bruta / Raw difference
         """
-        # Converter para PIL para compressão JPEG
+        # Converter para PIL para compressão JPEG / Convert to PIL for JPEG compression
         original_rgb = cv2.cvtColor(original, cv2.COLOR_BGR2RGB)
         pil_original = Image.fromarray(original_rgb)
         
-        # Recomprimir
+        # Recomprimir / Recompress
         buffer = io.BytesIO()
         pil_original.save(buffer, format='JPEG', quality=quality)
         buffer.seek(0)
         pil_recompressed = Image.open(buffer)
         
-        # Converter de volta para numpy
+        # Converter de volta para numpy / Convert back to numpy
         recompressed = cv2.cvtColor(
             np.array(pil_recompressed), 
             cv2.COLOR_RGB2BGR
         )
         
-        # Redimensionar recompressed para match se necessário
+        # Redimensionar se necessário / Resize if needed
         if original.shape != recompressed.shape:
             recompressed = cv2.resize(
                 recompressed, 
                 (original.shape[1], original.shape[0])
             )
         
-        # Calcular diferença absoluta
+        # Calcular diferença absoluta / Compute absolute difference
         diff = cv2.absdiff(original.astype(np.float32), 
                           recompressed.astype(np.float32))
         
-        # Multiplicar por fator de escala para visualização
+        # Multiplicar por fator de escala para visualização / Multiply by scale factor for visualization
         diff_scaled = diff * scale_factor
         
-        # Criar imagem ELA (escala de cinza da magnitude do erro)
+        # Criar imagem ELA (magnitude do erro) / Create ELA image (error magnitude)
         error_magnitude = np.sqrt(
             diff_scaled[:,:,0]**2 + 
             diff_scaled[:,:,1]**2 + 
             diff_scaled[:,:,2]**2
         )
         
-        # Normalizar para 0-255
+        # Normalizar para 0-255 / Normalize to 0-255
         ela_gray = np.clip(error_magnitude, 0, 255).astype(np.uint8)
         
-        # Aplicar colormap para visualização colorida
+        # Aplicar colormap para visualização colorida / Apply colormap for colored visualization
         ela_color = cv2.applyColorMap(ela_gray, cv2.COLORMAP_JET)
         
-        # Calcular erro médio por canal para análise
+        # Calcular erro médio por canal / Compute mean error per channel
         error_per_channel = np.mean(diff, axis=(0,1))
         
         return ela_color, ela_gray, error_per_channel, diff
@@ -137,7 +155,8 @@ class ELAAnalyzer:
     def _multi_quality_ela(self, original: np.ndarray) -> Tuple[np.ndarray, np.ndarray, Dict]:
         """
         Executa ELA em múltiplos níveis de qualidade para robustez.
-        Combina resultados ponderados.
+        Runs ELA at multiple quality levels for robustness.
+        Combina resultados ponderados. / Combines weighted results.
         """
         ela_results = []
         error_maps = []
@@ -151,17 +170,17 @@ class ELAAnalyzer:
             error_maps.append(ela_gray.astype(np.float32))
             channel_errors.append(channel_error)
         
-        # Combinar error maps (média ponderada - qualidade mais baixa pesa mais)
-        weights = [0.2, 0.3, 0.5]  # Pesos crescentes para qualidades mais baixas
+        # Combinar error maps (média ponderada) / Combine error maps (weighted average)
+        weights = [0.2, 0.3, 0.5]  # Pesos crescentes para qualidades mais baixas / Increasing weights for lower qualities
         combined_error = np.average(error_maps, axis=0, weights=weights)
         
-        # ELA final: usar o resultado de qualidade média para visualização
-        # mas com overlay do erro combinado
+        # ELA final: resultado de qualidade média com overlay do erro combinado
+        # Final ELA: medium quality result with combined error overlay
         final_ela = self._create_enhanced_ela_visualization(
             original, ela_results[1], combined_error
         )
         
-        # Estatísticas combinadas
+        # Estatísticas combinadas / Combined statistics
         stats = {
             'mean_channel_errors': np.mean(channel_errors, axis=0),
             'error_variance_across_qualities': np.var(error_maps, axis=0).mean()
@@ -175,33 +194,34 @@ class ELAAnalyzer:
                                             combined_error: np.ndarray) -> np.ndarray:
         """
         Cria visualização ELA melhorada com overlay e anotações.
+        Creates enhanced ELA visualization with overlay and annotations.
         """
         h, w = original.shape[:2]
         
-        # Criar canvas composto
-        # Layout: [Original | ELA | ELA + Overlay | Heatmap puro]
+        # Criar canvas composto / Create composite canvas
+        # Layout: [Original | ELA | ELA + Overlay | Heatmap puro] / Layout: [Original | ELA | ELA + Overlay | Pure Heatmap]
         canvas_width = w * 4
         canvas_height = h + 60  # Espaço para legendas
         canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255
         
-        # 1. Imagem original (reduzida)
+        # 1. Imagem original (reduzida) / 1. Original image (resized)
         orig_small = cv2.resize(original, (w, h))
         canvas[:h, :w] = orig_small
         
-        # 2. ELA base
+        # 2. ELA base / 2. Base ELA
         canvas[:h, w:2*w] = base_ela
         
-        # 3. Overlay ELA + Original
+        # 3. Overlay ELA + Original / 3. ELA + Original Overlay
         alpha = 0.6
         overlay = cv2.addWeighted(orig_small, 1-alpha, base_ela, alpha, 0)
         canvas[:h, 2*w:3*w] = overlay
         
-        # 4. Heatmap de erro combinado (mais sensível)
+        # 4. Heatmap de erro combinado / 4. Combined error heatmap
         error_norm = cv2.normalize(combined_error, None, 0, 255, cv2.NORM_MINMAX)
         error_colored = cv2.applyColorMap(error_norm.astype(np.uint8), cv2.COLORMAP_HOT)
         canvas[:h, 3*w:4*w] = error_colored
         
-        # Adicionar legendas
+        # Adicionar legendas / Add labels
         font = cv2.FONT_HERSHEY_SIMPLEX
         labels = [
             "Original",
@@ -215,7 +235,7 @@ class ELAAnalyzer:
             y_pos = h + 30
             cv2.putText(canvas, label, (x_pos, y_pos), font, 0.6, (0, 0, 0), 2)
         
-        # Adicionar barra de escala de erro
+        # Adicionar barra de escala de erro / Add error scale bar
         legend_y = h + 50
         cv2.rectangle(canvas, (10, legend_y), (canvas_width-10, legend_y+10), (200, 200, 200), -1)
         cv2.putText(canvas, "Low Error (Suspicious)", (10, legend_y-5), font, 0.4, (0, 0, 0), 1)
@@ -228,35 +248,37 @@ class ELAAnalyzer:
                                     original: np.ndarray) -> List[str]:
         """
         Identifica regiões da imagem com níveis de erro anômalos.
+        Identifies image regions with anomalous error levels.
         Usa segmentação por cor + análise de erro local.
+        Uses color segmentation + local error analysis.
         """
         regions = []
         h, w = error_map.shape
         
-        # Criar máscaras de erro
+        # Criar máscaras de erro / Create error masks
         low_error_mask = error_map < self.error_threshold_low
         high_error_mask = error_map > self.error_threshold_high
         
-        # Análise de regiões usando cor original
+        # Análise de regiões usando cor original / Region analysis using original color
         hsv = cv2.cvtColor(original, cv2.COLOR_BGR2HSV)
         
-        # Definir ranges para segmentação
-        # Pele
+        # Definir ranges para segmentação / Define segmentation ranges
+        # Pele / Skin
         lower_skin = np.array([0, 20, 70])
         upper_skin = np.array([20, 255, 255])
         skin_mask = cv2.inRange(hsv, lower_skin, upper_skin)
         
-        # Céu/Azul
+        # Céu/Azul / Sky/Blue
         lower_blue = np.array([90, 50, 50])
         upper_blue = np.array([130, 255, 255])
         blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
         
-        # Verde/Vegetação
+        # Verde/Vegetação / Green/Vegetation
         lower_green = np.array([35, 40, 40])
         upper_green = np.array([85, 255, 255])
         green_mask = cv2.inRange(hsv, lower_green, upper_green)
         
-        # Textura/Detalhes (alta frequência de cor)
+        # Textura/Detalhes / Texture/Details (high color frequency)
         gray = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 50, 150)
         texture_mask = edges > 0
@@ -303,16 +325,17 @@ class ELAAnalyzer:
     def _calculate_error_statistics(self, error_map: np.ndarray) -> Dict:
         """
         Calcula estatísticas detalhadas do mapa de erro.
+        Calculates detailed error map statistics.
         """
-        # Estatísticas básicas
+        # Estatísticas básicas / Basic statistics
         mean_error = float(np.mean(error_map))
         max_error = float(np.max(error_map))
         std_error = float(np.std(error_map))
         
-        # Percentis
+        # Percentis / Percentiles
         percentiles = np.percentile(error_map, [25, 50, 75, 90, 95, 99])
         
-        # Contagem de pixels por faixa de erro
+        # Contagem de pixels por faixa / Pixel count per range
         total_pixels = error_map.size
         low_error_pixels = np.sum(error_map < self.error_threshold_low)
         high_error_pixels = np.sum(error_map > self.error_threshold_high)
@@ -320,8 +343,8 @@ class ELAAnalyzer:
         bright_pixels_pct = (high_error_pixels / total_pixels) * 100
         suspicious_pixels_pct = (low_error_pixels / total_pixels) * 100
         
-        # Análise de distribuição (curtose - cauda da distribuição)
-        # Distribuição natural tende a ter cauda longa
+        # Análise de distribuição / Distribution analysis (kurtosis)
+        # Distribuição natural tende a ter cauda longa / Natural distribution tends to have long tail
         from scipy.stats import kurtosis
         try:
             error_kurtosis = float(kurtosis(error_map.flatten()))
@@ -350,12 +373,15 @@ class ELAAnalyzer:
                                            original: np.ndarray) -> List[str]:
         """
         Detecta inconsistências típicas de múltiplas compressões ou manipulação.
-        OTIMIZADO: Usa operações vetorizadas NumPy e IGNORA clipping.
+        Detects inconsistencies typical of multiple compressions or manipulation.
+        Otimizado com operações vetorizadas NumPy.
+        Optimized with vectorized NumPy operations.
         """
         inconsistencies = []
         h, w = error_map.shape
         
-        # 1. Detectar fronteiras abruptas de erro (indicativo de splicing)
+        # Detectar fronteiras abruptas / Detect abrupt boundaries (indicative of splicing)
+        # Detect abrupt error boundaries (indicative of splicing)
         grad_x = cv2.Sobel(error_map, cv2.CV_64F, 1, 0, ksize=3)
         grad_y = cv2.Sobel(error_map, cv2.CV_64F, 0, 1, ksize=3)
         gradient_magnitude = np.sqrt(grad_x**2 + grad_y**2)
@@ -364,7 +390,8 @@ class ELAAnalyzer:
         if high_gradient_pixels > (error_map.size * 0.005):
             inconsistencies.append("error_boundary_discontinuities")
         
-        # 2. Detectar padrão periódico de erro (JPEG blocking artifacts)
+        # Detectar padrão periódico de erro (artefatos de bloco JPEG)
+        # Detect periodic error pattern (JPEG blocking artifacts)
         block_size = 8
         h_crop = (h // block_size) * block_size
         w_crop = (w // block_size) * block_size
@@ -376,38 +403,41 @@ class ELAAnalyzer:
         block_means = blocks.mean(axis=(1, 3))
         inter_block_variance = np.var(block_means)
             
-        # Aumentei tolerância aqui também (WhatsApp gera muita variância de bloco)
-        if inter_block_variance > 150: # Subi de 50 para 80
+        # Tolerância alta (WhatsApp gera muita variância de bloco)
+        # High tolerance (WhatsApp generates high block variance)
+        if inter_block_variance > 150:
             inconsistencies.append("multiple_compression_blocks")
             
-        # 3. Detectar regiões de erro zero absoluto (CORRIGIDO: IGNORAR SATURAÇÃO)
-        # Em áreas saturadas (preto 0 ou branco 255), o erro é zero naturalmente.
-        # Precisamos ignorar esses pixels para não acusar fake falsamente.
-            
+        # Detectar regiões de erro zero absoluto, ignorando saturação
+        # Detect absolute zero error regions, ignoring saturation
+        # Áreas saturadas (preto/branco) têm erro zero naturalmente
+        # Saturated areas (black/white) have naturally zero error
         # Converte original para grayscale para checar brilho
+        # Converter para grayscale para checar brilho / Convert to grayscale to check brightness
         if len(original.shape) == 3:
             gray_orig = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
         else:
             gray_orig = original
 
-        # Máscara de pixels saturados (Muito escuros < 5 ou Muito claros > 250)
-        # Esses pixels NÃO mudam na recompressão, gerando erro 0 falso.
+        # Máscara de pixels saturados (escuros < 5 ou claros > 250)
+        # Saturated pixel mask (dark < 5 or bright > 250)
         saturated_mask = (gray_orig < 5) | (gray_orig > 250)
             
-        # Máscara de erro zero
+        # Máscara de erro zero / Zero error mask
         zero_error_mask = (error_map < 0.5)
             
-        # Zero Error REAL = Erro Zero E Não Saturado
+        # Erro zero real = erro zero em áreas não saturadas
+        # True zero error = zero error in non-saturated areas
         true_zero_error_pixels = np.sum(zero_error_mask & ~saturated_mask)
         valid_pixels_count = np.sum(~saturated_mask)
             
-        # Só acusa se tiver muito erro zero em áreas NÃO saturadas (Ex: Pele lisa demais de IA)
+        # Caso especial: áreas saturadas ignoradas / Special case: saturated areas ignored
         if valid_pixels_count > 0:
             zero_error_ratio = true_zero_error_pixels / valid_pixels_count
             if zero_error_ratio > 0.05: # > 5% da imagem válida
                 inconsistencies.append("zero_error_regions")
             
-        # 4. Detectar padrão de grid 8x8 anômalo
+        # Detectar padrão de grid 8x8 anômalo / Detect anomalous 8x8 grid pattern
         if block_means.size > 1:
             h_diff = np.diff(block_means, axis=1)
             v_diff = np.diff(block_means, axis=0)
@@ -425,9 +455,13 @@ class ELAAnalyzer:
                           stats: Dict,
                           affected_regions: List[str],
                           inconsistencies: List[str]) -> float:
+        """
+        Calcula o score de risco composto.
+        Calculates the composite risk score.
+        """
         scores = []
         
-        # Fator 1: Nível médio de erro (seu código atual)
+        # Fator 1: Nível médio de erro / Factor 1: Mean error level
         mean_error = stats['mean_error_level'] * 255
         if mean_error < 1.0:
             scores.append(0.95)
@@ -438,7 +472,7 @@ class ELAAnalyzer:
         else:
             scores.append(0.05)
         
-        # Fator 2: Pixels brilhantes (mantido)
+        # Fator 2: Pixels brilhantes / Factor 2: Bright pixels
         bright_pct = stats['bright_pixels_percentage']
         if bright_pct < 1.0:
             scores.append(0.9)
@@ -449,22 +483,22 @@ class ELAAnalyzer:
         else:
             scores.append(0.05)
         
-        # NOVO: Fator 3 - Percentual de Erro Suspeito Baixo (O FATOR QUE FALTAVA!)
-        # Fator 3 - Percentual de Erro Suspeito Baixo (MAIS AGRESSIVO)
+        # Fator 3: Percentual de erro suspeito baixo
+        # Factor 3: Suspicious low error percentage
         suspicious_pct = stats['suspicious_low_error_percentage']
         
         if suspicious_pct > 25.0: # > 25% (A sua editada tem 26.55%)
             scores.append(0.98) # AUMENTEI de 0.95 para 0.98
         elif suspicious_pct > 15.0:
-            scores.append(0.85) # AUMENTEI de 0.7 para 0.85
-        elif suspicious_pct > 8.0: # Aumentei sensibilidade aqui também
+            scores.append(0.85)
+        elif suspicious_pct > 8.0:
             scores.append(0.65)
         elif suspicious_pct > 5.0:
             scores.append(0.35)
         else:
             scores.append(0.05)
         
-        # Fator 4: Regiões afetadas (mantido, ajustado)
+        # Fator 4: Regiões afetadas / Factor 4: Affected regions
         region_weights = {
             'face': 0.8,
             'edges': 0.8,
@@ -480,7 +514,7 @@ class ELAAnalyzer:
         else:
             scores.append(0.0)
         
-        # Fator 5: Inconsistências (recalibrado)
+        # Fator 5: Inconsistências / Factor 5: Inconsistencies
         inconsistency_weights = {
             'zero_error_regions': 0.7,
             'multiple_compression_blocks': 0.4,
@@ -493,35 +527,34 @@ class ELAAnalyzer:
         else:
             scores.append(0.1)
         
-        # Fator 6: Curtose (mantido)
+        # Fator 6: Curtose / Factor 6: Kurtosis
         kurt = stats.get('error_kurtosis', 0)
         if kurt < -1.0:
             scores.append(0.5)
         else:
             scores.append(0.1)
         
-        # Média ponderada RECALIBRADA (agora são 6 fatores)
-        # Aumentei o peso do Fator 3 (Suspicious %) para 25%
+        # Média ponderada (6 fatores) / Weighted average (6 factors)
         weights = [0.12, 0.08, 0.35, 0.20, 0.15, 0.10]
         
         final_score = sum(s * w for s, w in zip(scores, weights))
         
-        # ============ BOOSTS FINAIS (CRITICAL COMBINATIONS) ============
+        # Boosts finais (combinações críticas) / Final boosts (critical combinations)
     
-        # Regra 1: Se tem >20% de pixels suspeitos E tem zero_error_regions, é quase certeza de edição
+        # Regra 1: >20% pixels suspeitos + zero_error_regions = edição quase certa
+        # Rule 1: >20% suspicious pixels + zero_error_regions = almost certain editing
         if stats['suspicious_low_error_percentage'] > 20.0 and 'zero_error_regions' in inconsistencies:
-            final_score = max(final_score, 0.75) # Força mínimo de 0.75
-            print("🚨 BOOST: Área extensa suspeita + Zero Error → Fake Confirmado")
+            final_score = max(final_score, 0.75)
     
-        # Regra 2: Se tem >25% suspeito E múltiplas inconsistências (3+), é montagem clara
+        # Regra 2: >25% suspeito + 3+ inconsistências = montagem clara
+        # Rule 2: >25% suspicious + 3+ inconsistencies = clear manipulation
         if stats['suspicious_low_error_percentage'] > 25.0 and len(inconsistencies) >= 3:
-            final_score = min(1.0, final_score * 1.35) # Multiplica por 1.5 (boost agressivo)
-            print("🚨 BOOST: Múltiplas inconsistências + Alto % suspeito → Manipulação Grave")
+            final_score = min(1.0, final_score * 1.35)
     
-        # Regra 3: Edição "Profissional" (baixo erro médio + alto suspicious %)
+        # Regra 3: Edição profissional (baixo erro + alto % suspeito)
+        # Rule 3: Professional editing (low error + high suspicious %)
         if mean_error < 50.0 and stats['suspicious_low_error_percentage'] > 20.0:
-            final_score = max(final_score, 0.70) # Força mínimo de 0.70
-            print("🚨 BOOST: Edição limpa detectada")
+            final_score = max(final_score, 0.70)
 
         
         return min(1.0, max(0.0, final_score))
@@ -530,26 +563,27 @@ class ELAAnalyzer:
                           stats: Dict,
                           affected_regions: List[str],
                           inconsistencies: List[str]) -> List[str]:
-        """Gera lista de avisos contextualizados"""
+        """
+        Gera lista de avisos contextualizados.
+        Generates contextualized warning list.
+        """
         warnings = []
         
-        # ===== NOVO: FILTRO DE RELEVÂNCIA =====
-        # Calcula o risk_score aqui também para contexto
-        # (Ou passe como argumento se preferir)
+        # Filtro de relevância: calcula risk_score para contexto
+        # Relevance filter: compute risk_score for context
         temp_risk = self._calculate_risk_score(stats, affected_regions, inconsistencies)
     
         # Se risco é baixo, ignora inconsistências leves (compressão normal)
+        # If risk is low, ignore minor inconsistencies (normal compression)
         if temp_risk < 0.4:
-            # Remove inconsistências "chatas" que são normais em JPEG
             inconsistencies_filtered = [
                 i for i in inconsistencies 
                 if i not in ['error_boundary_discontinuities', 'multiple_compression_blocks']
             ]
         else:
             inconsistencies_filtered = inconsistencies
-        # ===== FIM DO FILTRO =====
 
-        # Avisos sobre nível de erro
+        # Avisos sobre nível de erro / Warnings about error level
         mean_error = stats['mean_error_level'] * 255
         
         if mean_error < 3.0:
@@ -557,14 +591,14 @@ class ELAAnalyzer:
         elif mean_error < 8.0:
             warnings.append(f"Nível de erro suspeitamente baixo ({mean_error:.1f})")
         
-        # Avisos sobre distribuição
+        # Avisos sobre distribuição / Warnings about distribution
         if stats['bright_pixels_percentage'] < 5:
             warnings.append("Quase nenhuma variação de erro detectada - padrão artificial")
         
         if stats['suspicious_low_error_percentage'] > 30:
             warnings.append(f"{stats['suspicious_low_error_percentage']:.1f}% da imagem com erro anormalmente baixo")
         
-        # Avisos de regiões
+        # Avisos de regiões / Region warnings
         if 'face' in affected_regions:
             warnings.append("Alto nível de erro detectado na região do rosto - possível manipulação")
         
@@ -577,7 +611,7 @@ class ELAAnalyzer:
         if 'block_artifacts' in affected_regions:
             warnings.append("Artefatos de bloco 8x8 detectados - múltiplas compressões ou origem digital")
         
-        # Avisos de inconsistências
+        # Avisos de inconsistências / Inconsistency warnings
         if 'zero_error_regions' in inconsistencies_filtered:
             warnings.append("Regiões com erro zero absoluto - impossível em captura fotográfica real")
     
@@ -586,7 +620,7 @@ class ELAAnalyzer:
     
         if 'error_boundary_discontinuities' in inconsistencies_filtered:
             warnings.append("Fronteiras abruptas no nível de erro - possível montagem de imagens")
-        # Análise combinada
+        # Análise combinada / Combined analysis
         if mean_error < 5 and 'face' in affected_regions:
             warnings.append("Combinação crítica: baixo erro + região facial suspeita")
         
@@ -595,15 +629,17 @@ class ELAAnalyzer:
     def analyze(self, image_path: str) -> Dict:
         """
         Executa análise completa de Error Level Analysis.
+        Runs complete Error Level Analysis.
         
         Args:
-            image_path: Caminho para a imagem
+            image_path: Caminho para a imagem / Path to the image
             
         Returns:
             Dict no formato especificado do padrão de resposta
+            Dict in the specified response format
         """
         try:
-            # Carregar imagem
+            # Carregar imagem / Load image
             image = cv2.imread(image_path)
             if image is None:
                 return {
@@ -616,42 +652,43 @@ class ELAAnalyzer:
                 }
             
             # Verificar se é JPEG (ELA funciona melhor em imagens comprimidas)
+            # Check if JPEG (ELA works better on compressed images)
             is_jpeg = image_path.lower().endswith(('.jpg', '.jpeg'))
             if not is_jpeg:
-                # Salvar temporariamente como JPEG para aplicar ELA
+                # Salvar temporariamente como JPEG / Temporarily save as JPEG
                 _, buffer = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, 95])
                 image = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
-                warnings_list_init = ["Imagem convertida para análise JPEG"]
+                warnings_list_init = ["Imagem convertida para JPEG / Image converted for JPEG analysis"]
             else:
                 warnings_list_init = []
             
-            # Executar ELA multi-qualidade
+            # Executar ELA multi-qualidade / Run multi-quality ELA
             ela_image, error_map, extra_stats = self._multi_quality_ela(image)
             
-            # Calcular estatísticas
+            # Calcular estatísticas / Calculate statistics
             stats = self._calculate_error_statistics(error_map)
             
-            # Identificar regiões afetadas
+            # Identificar regiões afetadas / Identify affected regions
             affected_regions = self._identify_affected_regions(error_map, image)
             
-            # Detectar inconsistências
+            # Detectar inconsistências / Detect inconsistencies
             inconsistencies = self._detect_compression_inconsistencies(error_map, image)
             
-            # Converter para base64
+            # Converter para base64 / Convert to base64
             ela_base64 = self._convert_to_base64(ela_image)
             
 
-            # Calcular risco
+            # Calcular risco / Calculate risk
             risk_score = self._calculate_risk_score(
                 stats, affected_regions, inconsistencies
             )
             
-            # Gerar avisos
+            # Gerar avisos / Generate warnings
             warnings_list = warnings_list_init + self._generate_warnings(
                 stats, affected_regions, inconsistencies
             )
             
-            # Montar resposta
+            # Montar resposta / Build response
             metrics = {
                 "mean_error_level": stats['mean_error_level'],
                 "bright_pixels_percentage": stats['bright_pixels_percentage'],
@@ -664,7 +701,7 @@ class ELAAnalyzer:
                 "error_percentiles": stats['error_percentiles']
             }
 
-            # mapa ELA normalizado
+            # Mapa ELA normalizado / Normalized ELA map
             ela_map_normalized = error_map / 255.0 if np.max(error_map) > 0 else error_map
 
             return {
@@ -689,15 +726,18 @@ class ELAAnalyzer:
 
 
 # Função de conveniência para uso direto
+# Convenience function for direct use
 def analyze_ela(image_path: str) -> Dict:
     """
     Função standalone para análise de Error Level Analysis.
+    Standalone function for Error Level Analysis.
     
     Args:
-        image_path: Caminho para a imagem
+        image_path: Caminho para a imagem / Path to the image
         
     Returns:
         Dict com resultado da análise no padrão especificado
+        Dict with analysis result in the specified format
     """
 
     analyzer = ELAAnalyzer()

@@ -7,7 +7,10 @@ import base64
 
 
 def remove_accents(text: str) -> str:
-    """Remove acentos para compatibilidade com cv2.putText"""
+    """
+    Remove acentos para compatibilidade com cv2.putText.
+    Removes accents for compatibility with cv2.putText.
+    """
     replacements = {
         'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a',
         'é': 'e', 'ê': 'e',
@@ -27,7 +30,10 @@ def remove_accents(text: str) -> str:
     return text
 
 class ImageAnnotator:
-    """Anota imagens usando dados REAIS das análises"""
+    """
+    Anota imagens usando dados REAIS das análises.
+    Annotates images using REAL analysis data.
+    """
     
     def __init__(self):
         self.colors = {
@@ -44,14 +50,17 @@ class ImageAnnotator:
                               noise_result: Dict,
                               ela_result: Dict,
                               automated: Dict) -> str:
-        """Cria imagem anotada usando mapas reais das análises"""
+        """
+        Cria imagem anotada usando mapas reais das análises.
+        Creates annotated image using real analysis maps.
+        """
         
-        # Carregar imagem original
+        # Carregar imagem original / Load original image
         img = cv2.imread(image_path)
         if img is None:
-            raise ValueError("Não foi possível carregar a imagem")
+            raise ValueError("Não foi possível carregar a imagem / Could not load image")
         
-        # Redimensionar para visualização
+        # Redimensionar para visualização / Resize for visualization
         max_size = 1200
         h, w = img.shape[:2]
         scale = 1.0
@@ -61,43 +70,45 @@ class ImageAnnotator:
             img = cv2.resize(img, (new_w, new_h))
         else:
             new_w, new_h = w, h
-        
-        annotated = img.copy()
-        
-        # Coletar anotações reais
+            
+        # Coletar anotações reais / Collect real annotations
         annotations = []
         
-        # NOISE: Usar variance_map
+        # NOISE: Usar variance_map / Use variance_map
         if noise_result.get("status") == "success" and noise_result.get("variance_map"):
             noise_annotations = self._annotate_noise_real(
                 img, noise_result, scale
             )
             annotations.extend(noise_annotations)
         
-        # ELA: Usar ela_map
+        # ELA: Usar ela_map / Use ela_map
         if ela_result.get("status") == "success" and ela_result.get("ela_map"):
             ela_annotations = self._annotate_ela_real(
                 img, ela_result, scale
             )
             annotations.extend(ela_annotations)
         
-        # FFT: Marcação geral (não tem mapa espacial)
+        # FFT: Marcação geral / General marking (no spatial map)
         if fft_result.get("status") == "success":
             fft_annotations = self._annotate_fft_general(img, fft_result)
             annotations.extend(fft_annotations)
         
-        # Desenhar anotações
+        # Desenhar anotações / Draw annotations
+        annotated = img.copy()
         for annotation in annotations:
             annotated = self._draw_annotation(annotated, annotation)
         
-        # Header e legenda
+        # Header e legenda / Header and legend
         annotated = self._add_header(annotated, automated)
         annotated = self._add_legend(annotated, annotations)
         
         return self._to_base64(annotated)
     
     def _annotate_noise_real(self, img: np.ndarray, noise_result: Dict, scale: float) -> List[Dict]:
-        """Detecta áreas reais com ruído anormal usando variance_map"""
+        """
+        Detecta áreas reais com ruído anormal usando variance_map.
+        Detects real areas with abnormal noise using variance_map.
+        """
         annotations = []
         
         # Reconstruir variance_map
@@ -155,7 +166,10 @@ class ImageAnnotator:
         return annotations
     
     def _annotate_ela_real(self, img: np.ndarray, ela_result: Dict, scale: float) -> List[Dict]:
-        """Detecta áreas com inconsistências de compressão usando ELA map"""
+        """
+        Detecta inconsistências reais usando ela_map.
+        Detects real inconsistencies using ela_map.
+        """
         annotations = []
         
         # Reconstruir ELA map
@@ -206,7 +220,10 @@ class ImageAnnotator:
         return annotations
     
     def _annotate_fft_general(self, img: np.ndarray, fft_result: Dict) -> List[Dict]:
-        """FFT não tem mapa espacial - marcação geral"""
+        """
+        Cria anotação FFT baseada em artefatos de grid detectados.
+        Creates FFT annotation based on detected grid artifacts.
+        """
         annotations = []
         h, w = img.shape[:2]
         
@@ -227,7 +244,10 @@ class ImageAnnotator:
         return annotations
     
     def _draw_annotation(self, img: np.ndarray, annotation: Dict) -> np.ndarray:
-        """Desenha retângulo e texto"""
+        """
+        Desenha anotação visual na imagem.
+        Draws visual annotation on the image.
+        """
         box = annotation["box"]
         label = annotation["label"]
         detail = annotation.get("detail", "")
@@ -260,7 +280,10 @@ class ImageAnnotator:
         return img
     
     def _add_header(self, img: np.ndarray, automated: Dict) -> np.ndarray:
-        """Header com veredicto"""
+        """
+        Adiciona banner com veredito da IA.
+        Adds banner with AI verdict.
+        """
         h, w = img.shape[:2]
         header_h = 80
         header = np.zeros((header_h, w, 3), dtype=np.uint8)

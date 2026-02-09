@@ -10,7 +10,10 @@ import warnings
 
 @dataclass
 class NoiseAnalysisResult:
-    """Estrutura de dados para resultado da análise de ruído"""
+    """
+    Estrutura de dados para resultado da análise de ruído.
+    Data structure for noise analysis result.
+    """
     method: str
     status: str
     image_base64: str
@@ -22,13 +25,12 @@ class NoiseAnalysisResult:
 class NoiseMapAnalyzer:
     """
     Analisador de Mapa de Ruído para detecção de imagens geradas por IA.
+    Noise Map Analyzer for AI-generated image detection.
     
-    Principais características de imagens IA:
-    - Ruído anormalmente baixo ou perfeitamente consistente
-    - Regiões "lisas demais" (skin, céu, fundos)
-    - Ausência de padrão de ruído natural de sensores
-    
-    Versão 2.0: Suporte robusto a imagens sem metadados EXIF
+    Principais características de imagens IA / Main AI image characteristics:
+    - Ruído anormalmente baixo ou consistente / Abnormally low or consistent noise
+    - Regiões "lisas demais" / Overly smooth regions (skin, sky, backgrounds)
+    - Ausência de padrão de ruído natural / Absence of natural sensor noise pattern
     """
     
     def __init__(self, 
@@ -37,16 +39,19 @@ class NoiseMapAnalyzer:
                  high_noise_threshold: float = 30.0):
         """
         Args:
-            block_size: Tamanho do bloco para análise local de variância
-            low_noise_threshold: Limiar inferior para considerar "baixo ruído"
-            high_noise_threshold: Limiar superior para ruído alto
+            block_size: Tamanho do bloco para análise local / Block size for local analysis
+            low_noise_threshold: Limiar inferior de ruído / Low noise threshold
+            high_noise_threshold: Limiar superior de ruído / High noise threshold
         """
         self.block_size = block_size
         self.low_noise_threshold = low_noise_threshold
         self.high_noise_threshold = high_noise_threshold
         
     def _convert_to_base64(self, image: np.ndarray, format: str = 'PNG') -> str:
-        """Converte imagem numpy array para base64"""
+        """
+        Converte imagem numpy array para base64.
+        Converts numpy array image to base64.
+        """
         if len(image.shape) == 3 and image.shape[2] == 3:
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         else:
@@ -60,7 +65,10 @@ class NoiseMapAnalyzer:
         return img_str
     
     def _extract_iso_from_metadata(self, image_path: str) -> Optional[int]:
-        """Extrai valor ISO dos metadados EXIF da imagem"""
+        """
+        Extrai valor ISO dos metadados EXIF da imagem.
+        Extracts ISO value from image EXIF metadata.
+        """
         try:
             img = Image.open(image_path)
             exif_data = img._getexif()
@@ -80,9 +88,10 @@ class NoiseMapAnalyzer:
     
     def _estimate_iso_from_image_characteristics(self, image: np.ndarray) -> Tuple[int, str, str]:
         """
-        Estima ISO equivalente baseado nas características da imagem quando EXIF não disponível.
+        Estima ISO equivalente baseado nas características da imagem.
+        Estimates equivalent ISO based on image characteristics.
         
-        Retorna: (iso_estimado, confiança, método_usado)
+        Returns: (estimated_iso, confidence, method_used)
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
@@ -103,7 +112,10 @@ class NoiseMapAnalyzer:
         return estimated_iso, confidence, method
     
     def _analyze_current_noise(self, gray: np.ndarray) -> Dict:
-        """Analisa ruído presente na imagem usando múltiplas técnicas"""
+        """
+        Analisa ruído presente na imagem usando múltiplas técnicas.
+        Analyzes noise in the image using multiple techniques.
+        """
         h, w = gray.shape
         
         # Método 1: Variância do Laplaciano
@@ -137,7 +149,10 @@ class NoiseMapAnalyzer:
         }
     
     def _estimate_sharpness(self, gray: np.ndarray) -> float:
-        """Estima nível de nitidez da imagem"""
+        """
+        Estima nível de nitidez da imagem.
+        Estimates image sharpness level.
+        """
         sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
         sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
         sobel_magnitude = np.sqrt(sobelx**2 + sobely**2)
@@ -147,8 +162,8 @@ class NoiseMapAnalyzer:
     
     def _estimate_device_type(self, image: np.ndarray, noise_metrics: Dict) -> str:
         """
-        Estima tipo de dispositivo: professional_camera, smartphone, 
-        likely_ai_generated, digital_art_processed, ou unknown
+        Estima tipo de dispositivo / Estimates device type:
+        professional_camera, smartphone, likely_ai_generated, digital_art_processed, unknown
         """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
@@ -170,7 +185,10 @@ class NoiseMapAnalyzer:
             return "unknown"
     
     def _detect_sharpening_halos(self, image: np.ndarray) -> bool:
-        """Detecta halos de sharpening artificial"""
+        """
+        Detecta halos de sharpening artificial.
+        Detects artificial sharpening halos.
+        """
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
         
         edges = cv2.Canny(gray, 50, 150)
@@ -189,7 +207,10 @@ class NoiseMapAnalyzer:
         return edge_gradient_mean > 80
     
     def _analyze_histogram_naturalness(self, gray: np.ndarray) -> float:
-        """Analisa se histograma parece natural (1) ou processado/IA (0)"""
+        """
+        Analisa se histograma parece natural (1) ou processado/IA (0).
+        Analyzes if histogram looks natural (1) or processed/AI (0).
+        """
         hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
         hist = hist.flatten() / np.sum(hist)
         
@@ -211,7 +232,10 @@ class NoiseMapAnalyzer:
                                   noise_metrics: Dict, 
                                   sharpness: float,
                                   device_type: str) -> Tuple[int, str, str]:
-        """Calcula estimativa final de ISO"""
+        """
+        Calcula estimativa final de ISO.
+        Calculates final ISO estimate.
+        """
         noise_score = noise_metrics['composite_noise_score']
         
         if device_type == "likely_ai_generated":
@@ -272,8 +296,9 @@ class NoiseMapAnalyzer:
                            image: np.ndarray) -> Tuple[float, Optional[int], str, str]:
         """
         Obtém ruído esperado de forma robusta, com ou sem EXIF.
+        Gets expected noise robustly, with or without EXIF.
         
-        Retorna: (expected_noise, iso_value, source, confidence)
+        Returns: (expected_noise, iso_value, source, confidence)
         """
         # Tentar EXIF primeiro
         iso_from_exif = self._extract_iso_from_metadata(image_path)
@@ -295,7 +320,7 @@ class NoiseMapAnalyzer:
     def _estimate_expected_noise_from_iso(self, iso_value: int) -> float:
         """
         Estima nível de ruído esperado baseado no ISO.
-        Modelo logarítmico aproximado.
+        Estimates expected noise level based on ISO.
         """
         import math
         noise = 0.01 + 0.025 * math.log2(max(iso_value, 100) / 100)
@@ -303,7 +328,8 @@ class NoiseMapAnalyzer:
     
     def _calculate_local_variance(self, gray_image: np.ndarray) -> np.ndarray:
         """
-        Calcula variância local em blocos - OTIMIZADO.
+        Calcula variância local em blocos.
+        Calculates local variance in blocks.
         """
         h, w = gray_image.shape
         block_h, block_w = self.block_size, self.block_size
@@ -332,7 +358,10 @@ class NoiseMapAnalyzer:
         return variance_map_resized
 
     def _detect_sensor_pattern(self, gray: np.ndarray) -> bool:
-        """Detecta padrão de sensor Bayer ou banding - OTIMIZADO"""
+        """
+        Detecta padrão de sensor Bayer ou banding.
+        Detects Bayer sensor pattern or banding.
+        """
         h, w = gray.shape
         
         if h < 100 or w < 100:
@@ -364,7 +393,10 @@ class NoiseMapAnalyzer:
     def _identify_low_noise_regions(self, 
                                     variance_map: np.ndarray, 
                                     original_image: np.ndarray) -> List[str]:
-        """Identifica regiões com ruído anormalmente baixo"""
+        """
+        Identifica regiões com ruído anormalmente baixo.
+        Identifies regions with abnormally low noise.
+        """
         regions = []
         low_noise_mask = variance_map < self.low_noise_threshold
     
@@ -414,7 +446,10 @@ class NoiseMapAnalyzer:
         return regions
     
     def _calculate_noise_consistency(self, variance_map: np.ndarray) -> float:
-        """Calcula consistência do ruído - RECALIBRADO PARA IA MODERNA"""
+        """
+        Calcula consistência do ruído, calibrado para IA moderna.
+        Calculates noise consistency, calibrated for modern AI.
+        """
     
         variance_normalized = variance_map / (np.max(variance_map) + 1e-10)
     
@@ -439,11 +474,10 @@ class NoiseMapAnalyzer:
     
         region_variance = np.var(region_means) / (np.mean(region_means)**2 + 1e-10)
     
-        print(f"🔍 Consistency Debug: cv={cv:.3f}, region_var={region_variance:.5f}")
     
-        # ==== LÓGICA RECALIBRADA ====
-        # IA moderna: cv entre 2.0 - 3.5, region_var pode ser alto
-        # Real: cv > 3.5, region_var baixo (<0.3)
+        # Lógica recalibrada / Recalibrated logic
+        # IA moderna: cv entre 2.0-3.5 / Modern AI: cv between 2.0-3.5
+        # Real: cv > 3.5 / Real: cv > 3.5
     
         if cv < 1.0:  # Muito consistente (IA antiga)
             consistency = 0.95
@@ -468,7 +502,10 @@ class NoiseMapAnalyzer:
                               original_image: np.ndarray,
                               iso_source: str,
                               iso_confidence: str) -> np.ndarray:
-        """Cria heatmap colorizado com informações de estimativa"""
+        """
+        Cria heatmap colorizado com informações de estimativa.
+        Creates colorized heatmap with estimation info.
+        """
         variance_norm = cv2.normalize(
             variance_map, None, 0, 255, cv2.NORM_MINMAX
         ).astype(np.uint8)
@@ -512,10 +549,14 @@ class NoiseMapAnalyzer:
                           low_noise_regions: List[str],
                           expected_noise: float,
                             iso_confidence: str) -> float:
-        """Calcula score de risco composto"""
+        """
+        Calcula score de risco composto.
+        Calculates composite risk score.
+        """
         scores = []
         
         # Fator 1: Diferença entre esperado e observado
+        # Factor 1: Difference between expected and observed
         noise_ratio = mean_noise / expected_noise if expected_noise > 0 else 1.0
         
         if noise_ratio < 0.5:
@@ -533,32 +574,32 @@ class NoiseMapAnalyzer:
         else:
             scores.append(0.1)
         
-        # Fator 2: Consistência (LIMIARES MAIS AGRESSIVOS)
+        # Fator 2: Consistência / Factor 2: Consistency
         if noise_consistency > 0.95:
-            scores.append(0.98)  # Era 0.95
+            scores.append(0.98)
         elif noise_consistency > 0.85:
-            scores.append(0.9)   # Era 0.8
-        elif noise_consistency > 0.6:  # IA moderna
-            scores.append(0.85)  # ERA 0.75 ← AQUI É O GANHO
+            scores.append(0.9)
+        elif noise_consistency > 0.6:
+            scores.append(0.85)
         elif noise_consistency > 0.4:
-            scores.append(0.6)   # Era 0.5
+            scores.append(0.6)
         elif noise_consistency > 0.2:
-            scores.append(0.3)   # Era 0.2
+            scores.append(0.3)
         else:
             scores.append(0.05)
         
-        # Fator 3: Regiões
+        # Fator 3: Regiões / Factor 3: Regions
         if "artificial_uniformity" in low_noise_regions:
-            scores.append(0.85)  # Era 0.8
+            scores.append(0.85)
         elif len(low_noise_regions) >= 2:
-            scores.append(0.5)   # Era 0.4
+            scores.append(0.5)
         elif len(low_noise_regions) >= 1:
-            scores.append(0.25)  # Era 0.2
+            scores.append(0.25)
         else:
             scores.append(0.0)
         
-        # ==== NOVO: Fator 4 - Padrão de Ruído Sintético ====
-        # Detecta IA adicionando ruído fake (alto + consistente)
+        # Fator 4: Padrão de Ruído Sintético / Factor 4: Synthetic Noise Pattern
+        # Detecta IA adicionando ruído fake / Detects AI adding fake noise
         synthetic_noise_score = 0.0
         if noise_ratio > 2.0 and 0.5 < noise_consistency < 0.8:
             # IA moderna: adiciona MUITO ruído mas com padrão
@@ -568,20 +609,23 @@ class NoiseMapAnalyzer:
         
         scores.append(synthetic_noise_score)
         
-        # Pesos: [Fator1, Fator2, Fator3, Fator4]
+        # Pesos / Weights: [Factor1, Factor2, Factor3, Factor4]
         weights = [0.10, 0.45, 0.10, 0.35]  # Fator 4 pesa 35%
         final_score = sum(s * w for s, w in zip(scores, weights))
         
-        # Ajuste por confiança
+        # Ajuste por confiança / Confidence adjustment
         if iso_confidence == "low":
-            final_score = final_score * 0.95  # Era 0.9
+            final_score = final_score * 0.95
         
         return min(1.0, max(0.0, final_score))
 
 
 
     def _get_interpretation(self, risk_score: float) -> str:
-        """Interpreta o risk score"""
+        """
+        Interpreta o risk score.
+        Interprets the risk score.
+        """
         if risk_score < 0.15:
             return "Muito provavelmente real"
         elif risk_score < 0.35:
@@ -601,11 +645,15 @@ class NoiseMapAnalyzer:
                       iso_value: Optional[int],
                       iso_source: str,
                       iso_confidence: str,
-                      risk_score: float) -> List[str]:  # ← ADICIONAR risk_score
-        """Gera lista de avisos contextualizada"""
+                      risk_score: float) -> List[str]:
+        """
+        Gera lista de avisos contextualizada.
+        Generates context-filtered warning list.
+        """
         warnings = []
         
         # Aviso sobre metadados (sempre relevante)
+        # Metadata warning (always relevant)
         if iso_source != "exif":
             if iso_confidence == "low":
                 warnings.append(
@@ -618,25 +666,24 @@ class NoiseMapAnalyzer:
                     f"sem metadados EXIF originais"
                 )
         
-        # ==== NOVOS FILTROS CONTEXTUAIS ====
-        # Só gerar warnings se o risco for médio/alto (>0.35)
+        # Filtros contextuais - só gerar warnings se risco > 0.35
+        # Contextual filters - only generate warnings if risk > 0.35
         
-        # Aviso sobre ruído baixo
+        # Aviso sobre ruído baixo / Low noise warning
         if mean_noise < expected_noise * 0.5 and risk_score > 0.35:
             warnings.append(
                 f"Ruído anormalmente baixo ({mean_noise:.3f} vs esperado {expected_noise:.3f})"
             )
         
-        # Aviso sobre consistência
+        # Aviso sobre consistência / Consistency warning
         if noise_consistency > 0.95:
             warnings.append("Ruído perfeitamente consistente - padrão típico de IA")
         elif noise_consistency > 0.85:
             warnings.append("Alta consistência no padrão de ruído")
         elif noise_consistency > 0.6 and risk_score > 0.5:
-            # Só avisar se o score também for alto
             warnings.append("Padrão de ruído com consistência moderada-alta")
         
-        # Avisos de regiões - FILTRADOS POR SCORE
+        # Avisos de regiões, filtrados por score / Region warnings, filtered by score
         if risk_score > 0.35:  # Só avisar se suspeito
             if "skin" in low_noise_regions:
                 warnings.append("Textura de pele anormalmente lisa")
@@ -655,7 +702,7 @@ class NoiseMapAnalyzer:
         if iso_source == "ai_pattern_detected":
             warnings.append("Padrão visual sugere imagem gerada por IA (uniformidade excessiva)")
         
-        # ==== NOVO: Aviso de Ruído Sintético ====
+        # Aviso de Ruído Sintético / Synthetic Noise Warning
         noise_ratio = mean_noise / expected_noise if expected_noise > 0 else 1.0
         if noise_ratio > 2.0 and 0.5 < noise_consistency < 0.8:
             warnings.append("Ruído sintético detectado - típico de IA adicionando ruído fake")
@@ -664,7 +711,10 @@ class NoiseMapAnalyzer:
 
     
     def analyze(self, image_path: str) -> Dict:
-        """Executa análise completa de Mapa de Ruído com fallback robusto"""
+        """
+        Executa análise completa de Mapa de Ruído.
+        Runs complete Noise Map analysis.
+        """
         try:
             image = cv2.imread(image_path)
             if image is None:
@@ -679,15 +729,15 @@ class NoiseMapAnalyzer:
             
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             
-            # Obter ruído esperado (com ou sem EXIF)
+            # Obter ruído esperado / Get expected noise
             expected_noise, iso_value, iso_source, iso_confidence = self._get_expected_noise(
                 image_path, image
             )
             
-            # Calcular mapa de variância
+            # Calcular mapa de variância / Compute variance map
             variance_map = self._calculate_local_variance(gray)
             
-            # Métricas
+            # Métricas / Metrics
             mean_noise = float(np.mean(variance_map))
             max_noise = float(np.max(variance_map))
             mean_noise_normalized = mean_noise / 255.0
@@ -695,20 +745,14 @@ class NoiseMapAnalyzer:
             noise_consistency = self._calculate_noise_consistency(variance_map)
             low_noise_regions = self._identify_low_noise_regions(variance_map, image)
             variance_map_normalized = variance_map / (np.max(variance_map) + 1e-10)
-
-            print(f"🔍 NOISE Debug:")
-            print(f"   mean_noise_normalized: {mean_noise_normalized:.4f}")
-            print(f"   noise_consistency: {noise_consistency:.4f}")
-            print(f"   low_noise_threshold: {self.low_noise_threshold}")
-            print(f"   regions: {low_noise_regions}")
             
-            # Criar heatmap
+            # Criar heatmap / Create heatmap
             heatmap_image = self._create_noise_heatmap(
                 variance_map, image, iso_source, iso_confidence
             )
             heatmap_base64 = self._convert_to_base64(heatmap_image)
             
-            # Calcular risco
+            # Calcular risco / Calculate risk
             risk_score = self._calculate_risk_score(
                 mean_noise_normalized, 
                 noise_consistency, 
@@ -717,7 +761,7 @@ class NoiseMapAnalyzer:
                 iso_confidence
             )
             
-            # Gerar avisos
+            # Gerar avisos / Generate warnings
             warnings_list = self._generate_warnings(
                 mean_noise_normalized,
                 noise_consistency,
@@ -729,7 +773,7 @@ class NoiseMapAnalyzer:
                 risk_score
             )
             
-            # Montar métricas
+            # Montar métricas / Build metrics
             metrics = {
                 "mean_noise_level": round(mean_noise_normalized, 4),
                 "noise_consistency": round(noise_consistency, 4),
@@ -763,8 +807,11 @@ class NoiseMapAnalyzer:
             }
 
 
-# Função de conveniência
+# Função de conveniência / Convenience function
 def analyze_noise(image_path: str) -> Dict:
-    """Função standalone para análise de mapa de ruído"""
+    """
+    Função standalone para análise de mapa de ruído.
+    Standalone function for noise map analysis.
+    """
     analyzer = NoiseMapAnalyzer()
     return analyzer.analyze(image_path)

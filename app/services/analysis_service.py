@@ -17,18 +17,23 @@ from app.services.image_annotator import ImageAnnotator
 
 
 class CostTracker:
-    """Rastreia custos da API Gemini"""
+    """
+    Rastreia custos da API Gemini.
+    Tracks Gemini API costs.
+    """
     
     def __init__(self):
-        # Usar Redis para rastreamento distribuído (ou arquivo local)
-        self.max_daily_cost = float(os.getenv("MAX_DAILY_GEMINI_COST", "5.0"))  # $5/dia
-        self.max_monthly_cost = float(os.getenv("MAX_MONTHLY_GEMINI_COST", "50.0"))  # $50/mês
+        self.max_daily_cost = float(os.getenv("MAX_DAILY_GEMINI_COST", "5.0"))
+        self.max_monthly_cost = float(os.getenv("MAX_MONTHLY_GEMINI_COST", "50.0"))
         
-        # Custo aproximado do Gemini (ajustar conforme modelo)
-        self.cost_per_request = 0.002  # ~$0.002 por análise
+        # Custo aproximado do Gemini / Approximate Gemini cost
+        self.cost_per_request = 0.002
     
     def can_make_request(self) -> tuple[bool, str]:
-        """Verifica se pode fazer requisição baseado no budget"""
+        """
+        Verifica se pode fazer requisição baseado no budget.
+        Checks if a request can be made based on budget.
+        """
         today_cost = self._get_today_cost()
         month_cost = self._get_month_cost()
         
@@ -41,22 +46,25 @@ class CostTracker:
         return True, "OK"
     
     def track_request(self):
-        """Registra custo de uma requisição"""
-        # Incrementar contador
-        # Implementação depende se usa Redis, SQLite, ou arquivo
+        """
+        Registra custo de uma requisição.
+        Registers the cost of a request.
+        """
         pass
     
     def _get_today_cost(self) -> float:
-        # Ler custos do dia
-        # Implementação simplificada
+        """Retorna custo do dia / Returns today's cost"""
         return 0.0
     
     def _get_month_cost(self) -> float:
-        # Ler custos do mês
+        """Retorna custo do mês / Returns month's cost"""
         return 0.0
 
 class AnalysisService:
-    """Serviço consolidado de análise de imagem com integração Gemini"""
+    """
+    Serviço consolidado de análise de imagem com integração Gemini.
+    Consolidated image analysis service with Gemini integration.
+    """
     
     def __init__(self, custom_gemini_key: Optional[str] = None):
         self.fft_analyzer = FFTAnalyzer()
@@ -65,29 +73,26 @@ class AnalysisService:
         self.annotator = ImageAnnotator() 
         
         # Configurar Gemini com chave customizada ou do servidor
+        # Configure Gemini with custom or server key
         if custom_gemini_key:
-            # Cliente forneceu sua própria chave
+            # Cliente forneceu sua própria chave / Client provided their own key
             try:
                 self.client = genai.Client(api_key=custom_gemini_key)
                 self.gemini_enabled = True
                 self.using_custom_key = True
-                print("✅ Usando chave Gemini customizada do cliente")
             except Exception as e:
-                print(f"⚠️ Chave Gemini customizada inválida: {e}")
                 self.gemini_enabled = False
                 self.using_custom_key = False
         else:
-            # Usar chave do servidor
+            # Usar chave do servidor / Use server key
             api_key = os.getenv("GEMINI_API_KEY")
             if not api_key:
-                print("⚠️ WARNING: GEMINI_API_KEY não configurada. Análise Gemini desabilitada.")
                 self.gemini_enabled = False
                 self.using_custom_key = False
             else:
                 self.client = genai.Client(api_key=api_key)
                 self.gemini_enabled = True
                 self.using_custom_key = False
-                print("✅ Usando chave Gemini do servidor")
     
     async def analyze_full(self, image_path: str) -> Dict:
         """
@@ -98,9 +103,7 @@ class AnalysisService:
         4. Retorna veredicto final
         """
         
-        print(f"🔍 Iniciando análise completa: {image_path}")
-        
-        # Executar análises em paralelo
+        # Executar análises em paralelo / Run analyses in parallel
         fft_result, noise_result, ela_result = await asyncio.gather(
             asyncio.to_thread(self.fft_analyzer.analyze, image_path),
             asyncio.to_thread(self.noise_analyzer.analyze, image_path),
@@ -108,23 +111,18 @@ class AnalysisService:
             return_exceptions=True
         )
         
-        # Tratar exceções
+        # Tratar exceções / Handle exceptions
         if isinstance(fft_result, Exception):
-            print(f"❌ FFT Error: {fft_result}")
             fft_result = self._empty_result("FFT", str(fft_result))
         if isinstance(noise_result, Exception):
-            print(f"❌ NOISE Error: {noise_result}")
             noise_result = self._empty_result("NOISE", str(noise_result))
         if isinstance(ela_result, Exception):
-            print(f"❌ ELA Error: {ela_result}")
             ela_result = self._empty_result("ELA", str(ela_result))
         
-        print(f"✅ Análises concluídas: FFT={fft_result['risk_score']:.2f}, NOISE={noise_result['risk_score']:.2f}, ELA={ela_result['risk_score']:.2f}")
-        
-        # Consolidar análise automatizada
+        # Consolidar análise automatizada / Consolidate automated analysis
         automated = self._consolidate_results(fft_result, noise_result, ela_result)
         
-        # Enviar para Gemini (se habilitado)
+        # Enviar para Gemini (se habilitado) / Send to Gemini (if enabled)
         if self.gemini_enabled:
             gemini_analysis = await self._analyze_with_gemini(
                 automated, fft_result, noise_result, ela_result
@@ -137,21 +135,20 @@ class AnalysisService:
             }
         
 
-        # Gerar imagem anotada
+        # Gerar imagem anotada / Generate annotated image
         try:
             annotated_image_base64 = self.annotator.annotate_full_analysis(
                 image_path, fft_result, noise_result, ela_result, automated
             )
-            print("✅ Imagem anotada gerada")
         except Exception as e:
-            print(f"⚠️ Erro ao gerar imagem anotada: {e}")
             annotated_image_base64 = ""
 
-        # Remover mapas espaciais dos resultados originais (se existirem)
+        # Remover mapas espaciais dos resultados (se existirem)
+        # Remove spatial maps from results (if present)
         noise_result.pop("variance_map", None)
         ela_result.pop("ela_map", None)
 
-        # Agora criar os objetos limpos
+        # Criar objetos limpos / Create clean objects
         fft_clean = {
             "method": fft_result.get("method"),
             "status": fft_result.get("status"),
@@ -194,7 +191,10 @@ class AnalysisService:
         }
             
     def _empty_result(self, method: str, error_msg: str) -> Dict:
-        """Retorna resultado vazio em caso de erro"""
+        """
+        Retorna resultado vazio em caso de erro.
+        Returns empty result on error.
+        """
         return {
             "method": method,
             "status": "error",
@@ -206,7 +206,10 @@ class AnalysisService:
     
 
     def _extract_explanation(self, text: str) -> str:
-        """Extrai apenas a seção EXPLANATION"""
+        """
+        Extrai apenas a seção EXPLANATION.
+        Extracts only the EXPLANATION section.
+        """
         lines = text.split('\n')
         explanation = []
         capturing = False
@@ -224,7 +227,10 @@ class AnalysisService:
         return ' '.join(explanation) if explanation else text[:200]
 
     def _extract_key_indicators(self, text: str) -> List[str]:
-        """Extrai bullet points de KEY INDICATORS"""
+        """
+        Extrai bullet points de KEY INDICATORS.
+        Extracts KEY INDICATORS bullet points.
+        """
         lines = text.split('\n')
         indicators = []
         capturing = False
@@ -243,9 +249,12 @@ class AnalysisService:
 
 
     def _consolidate_results(self, fft: Dict, noise: Dict, ela: Dict) -> Dict:
-        """Consolida os 3 resultados em um veredicto automatizado"""
+        """
+        Consolida os 3 resultados em um veredicto automatizado.
+        Consolidates the 3 results into an automated verdict.
+        """
         
-        # Pesos por confiabilidade
+        # Pesos por confiabilidade / Weights by reliability
         weights = {
             "FFT": 0.25,
             "NOISE": 0.50,
@@ -277,12 +286,6 @@ class AnalysisService:
         evidence = self._extract_evidence(fft, noise, ela, final_score)
         confidence = self._calculate_confidence(valid_methods, final_score)
 
-        # DEBUG FINAL (REMOVE DEPOIS)
-        print(f"🎯 CONSOLIDATED RESULT:")
-        print(f"   Final Score: {final_score}")
-        print(f"   Interpretation: {interpretation}")
-        print(f"   Confidence: {confidence}")
-        
         return {
             "final_score": round(final_score, 2),
             "interpretation": interpretation,
@@ -298,9 +301,10 @@ class AnalysisService:
         }
         
     def _interpret_score(self, score: float) -> str:
-        """Interpreta o score final"""
-        print(f"🔍🔍🔍 DEBUG: Score recebido = {score:.4f}")
-        
+        """
+        Interpreta o score final.
+        Interprets the final score.
+        """
         if score < 0.15:
             interpretation = "Muito provavelmente REAL"
         elif score < 0.35:
@@ -312,11 +316,13 @@ class AnalysisService:
         else:
             interpretation = "Muito provavelmente IA"
         
-        print(f"🔍🔍🔍 DEBUG: Interpretação = {interpretation}")
         return interpretation
     
     def _calculate_confidence(self, valid_methods: List[str], score: float) -> str:
-        """Calcula confiança geral"""
+        """
+        Calcula confiança geral.
+        Calculates overall confidence.
+        """
         base_confidence = len(valid_methods) / 3.0
         
         if 0.40 <= score <= 0.60:
@@ -334,7 +340,10 @@ class AnalysisService:
             return "very_low"
     
     def _extract_evidence(self, fft: Dict, noise: Dict, ela: Dict, final_score: float) -> List[str]:
-        """Extrai evidências-chave"""
+        """
+        Extrai evidências-chave.
+        Extracts key evidence.
+        """
         evidence = []
         
         # FFT
@@ -369,7 +378,10 @@ class AnalysisService:
         return evidence[:6]
     
     def _generate_recommendation(self, score: float, confidence: str) -> str:
-        """Gera recomendação"""
+        """
+        Gera recomendação.
+        Generates recommendation.
+        """
         if score > 0.75 and confidence in ["high", "very_high"]:
             return "🚫 REJEITAR - Alta probabilidade de IA"
         elif score > 0.55:
@@ -380,13 +392,14 @@ class AnalysisService:
             return "✅ APROVAR - Características naturais"
     
     async def _analyze_with_gemini(self, automated: Dict, fft: Dict, noise: Dict, ela: Dict) -> Dict:
-        """Envia para Gemini usando nova API"""
+        """
+        Envia para Gemini usando nova API.
+        Sends to Gemini using new API.
+        """
         
         prompt = self._build_gemini_prompt(automated, fft, noise, ela)
         
         try:
-            print("🤖 Consultando Gemini...")
-            
             response = await asyncio.to_thread(
                 self.client.models.generate_content,
                 model='gemini-3-flash-preview',
@@ -396,7 +409,7 @@ class AnalysisService:
             text = response.text.strip()
             verdict = self._parse_gemini_verdict(text)
             
-            # Extrair confiança da resposta
+            # Extrair confiança da resposta / Extract confidence from response
             confidence = "medium"
             if "CONFIDENCE:" in text.upper():
                 if "HIGH" in text.upper():
@@ -404,7 +417,6 @@ class AnalysisService:
                 elif "LOW" in text.upper():
                     confidence = "low"
             
-            print(f"✅ Gemini respondeu: {verdict} (confiança: {confidence})")
             
             return {
                 "verdict": verdict,
@@ -415,7 +427,6 @@ class AnalysisService:
             }
             
         except Exception as e:
-            print(f"❌ Gemini Error: {e}")
             import traceback
             traceback.print_exc()
             
@@ -428,12 +439,15 @@ class AnalysisService:
             }
     
     def _build_gemini_prompt(self, automated: Dict, fft: Dict, noise: Dict, ela: Dict) -> str:
-        """Constrói prompt otimizado para Gemini 3"""
+        """
+        Constrói prompt otimizado para Gemini.
+        Builds optimized prompt for Gemini.
+        """
         
-        # Construir lista de evidências
+        # Construir lista de evidências / Build evidence list
         evidence_list = "\n".join([f"• {ev}" for ev in automated['key_evidence']]) if automated['key_evidence'] else "• No significant evidence detected"
         
-        # Warnings consolidados
+        # Warnings consolidados / Consolidated warnings
         all_warnings = []
         for method_name, result in [("FFT", fft), ("NOISE", noise), ("ELA", ela)]:
             warnings = result.get('warnings', [])
@@ -499,21 +513,23 @@ class AnalysisService:
         return prompt
     
     def _parse_gemini_verdict(self, text: str) -> str:
-        """Extrai veredicto do formato estruturado"""
+        """
+        Extrai veredicto do formato estruturado.
+        Extracts verdict from structured format.
+        """
         text_upper = text.upper()
         
-        # Buscar na linha VERDICT:
+        # Buscar na linha VERDICT / Search in VERDICT line
         if "VERDICT:" in text_upper or "VERDICT**:" in text_upper:
-            # Pegar linha após VERDICT
-            lines = text.split('\n')
+            # Pegar linha após VERDICT / Get line after VERDICT
             for i, line in enumerate(lines):
                 if 'VERDICT' in line.upper():
-                    # Pegar o conteúdo da mesma linha ou próxima
+                    # Conteúdo da mesma linha ou próxima / Content from same or next line
                     verdict_text = line.upper()
                     if i + 1 < len(lines):
                         verdict_text += " " + lines[i + 1].upper()
                     
-                    # Verificar em ordem de prioridade
+                    # Verificar em ordem de prioridade / Check in priority order
                     if "AI-GENERATED" in verdict_text or "AI GENERATED" in verdict_text:
                         return "IA"
                     elif "REAL" in verdict_text and "AI" not in verdict_text:
@@ -522,7 +538,7 @@ class AnalysisService:
                         return "INCONCLUSIVO"
                     break
         
-        # Fallback: buscar nos primeiros 200 caracteres
+        # Fallback: buscar nos primeiros 200 caracteres / Fallback: search first 200 chars
         header = text_upper[:200]
         
         if "AI-GENERATED" in header or ("AI" in header and "GENERATED" in header):
@@ -532,12 +548,15 @@ class AnalysisService:
         elif "INCONCLUSIVE" in header:
             return "INCONCLUSIVO"
         
-        # Se não achou nada claro, marca como inconclusivo
-        print(f"⚠️ Não foi possível extrair veredicto claro. Texto: {text[:100]}...")
+        # Se não encontrou nada claro, marca como inconclusivo
+        # If nothing clear found, mark as inconclusive
         return "INCONCLUSIVO"
     
     def _base64_to_pil(self, base64_str: str) -> Image.Image:
-        """Converte base64 para PIL"""
+        """
+        Converte base64 para PIL.
+        Converts base64 to PIL.
+        """
         try:
             img_bytes = base64.b64decode(base64_str)
             img = Image.open(io.BytesIO(img_bytes))
