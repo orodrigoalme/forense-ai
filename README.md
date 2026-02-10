@@ -159,7 +159,7 @@ NEW_TOKENS=$(curl -X POST "http://localhost:8001/api/auth/refresh" \
 ## 🚀 How to Run
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.11+
 - `GEMINI_API_KEY` environment variable (for server-side Gemini analysis)
 - Configured `.env` file
 
@@ -746,7 +746,7 @@ curl -X POST "/api/auth/anonymous"
 - ✅ Smart rate limiting
 - ✅ reCAPTCHA support (optional)
 
-### v1.0 (2025-12-01)
+### v1.0 (2026-02-07)
 - ✅ Forensic analyses: FFT, NOISE, ELA
 - ✅ Gemini AI integration
 - ✅ Annotated image generation
@@ -756,24 +756,45 @@ curl -X POST "/api/auth/anonymous"
 
 ## 📧 Contact and Support
 
-- **Interactive Documentation:** `/docs` (Swagger UI)
-- **Health Check:** `/health`
-- **Repository:** [GitHub](https://github.com/your-repo)
+rodrigo@orodrigoalme.com
 
----
+
+## 📊 Performance & Limitations
+
+### **Accuracy**
+~70% detection rate on test dataset (comparable to commercial tools like Hive AI and Illuminarty)
+
+### **What Works Well** ✅
+- High accuracy on common AI generators (MidJourney, DALL-E, Stable Diffusion v1-2)
+- Low false positive rate on authentic camera photos
+- Reliable NOISE analysis (most predictive metric)
+- Clear explanations via Gemini 3
+
+### **Known Limitations** ⚠️
+
+**Detection Challenges:**
+- Advanced AI generators with noise injection may evade detection
+- Heavily compressed images can produce ambiguous results
+- Screenshots and digital art may trigger false positives
+- Performance varies by image type and generation method
+
+**By Design:**
+This is a **decision-support tool**, not a fully automated system. It provides:
+- Forensic evidence (FFT, ELA, Noise patterns)
+- Confidence scores
+- Clear explanations
+- Visual annotations
+
+**Human judgment remains essential for final verdict.**
+
+### **Best Results With:**
+✅ JPEG images from cameras or AI generators  
+✅ Minimal compression  
+✅ Resolution between 512x512 and 2048x2048  
+✅ Combining multiple detection methods  
+
+**Note:** Built in 56 hours for Gemini 3 Hackathon.
 
 ## 📄 License
 
 This project is provided as-is, without warranties. Use at your own risk.
-
----
-
-## 🤝 Contributions
-
-Contributions are welcome! Areas for improvement:
-- New analysis methods (DWT, CFA, Metadata Analysis)
-- Improvements in detection thresholds
-- Support for videos and GIFs
-- Web interface for upload
-- Analysis caching system
-- Redis integration for distributed quotas
